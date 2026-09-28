@@ -120,6 +120,7 @@ function assemble(meeting, talkScale) {
     }
     const seg = {
       meeting_id: meeting.id,
+      ord: segments.length,
       speaker_id: sp.id,
       speaker_name: sp.name,
       start_ms: Math.round(start),

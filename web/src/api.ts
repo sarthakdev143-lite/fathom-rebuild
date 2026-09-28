@@ -3,6 +3,7 @@
 
 export type Segment = {
   id: number;
+  edited?: number;
   start_ms: number;
   end_ms: number;
   text: string;
@@ -82,6 +83,10 @@ export const api = {
     req<{ template: string; summary: Summary; action_items: ActionItem[] }>(`/api/meetings/${encodeURIComponent(id)}/template`, {
       method: "POST", body: JSON.stringify({ template }),
     }),
+  renameSpeaker: (meetingId: string, speakerId: string, name: string) =>
+    req<{ ok: boolean; renamed_from: string; name: string }>(`/api/meetings/${encodeURIComponent(meetingId)}/speakers/${encodeURIComponent(speakerId)}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+  correctSegment: (id: number, text: string) =>
+    req<{ ok: boolean; edited: boolean }>(`/api/segments/${id}`, { method: "PATCH", body: JSON.stringify({ text }) }),
   toggleAction: (id: string, done: boolean) =>
     req<{ ok: boolean }>(`/api/action-items/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ done }) }),
   addHighlight: (id: string, h: { start_ms: number; end_ms?: number; label?: string; note?: string; source?: string }) =>

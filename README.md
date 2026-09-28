@@ -209,10 +209,27 @@ transcript correction, comments. Reasoning for each cut is in `docs/PLAN.md` §3
 Search is a `LIKE` scan over ~2,200 rows — a few milliseconds here, and the honest next step is an
 FTS5 index if the corpus grows. Noted rather than pre-optimised.
 
+**Search and Ask are hybrid when the corpus is embedded, lexical until then.**
+`shared/ai/embed.mjs` + `scripts/build-embeddings.mjs` embed every segment with
+`gemini-embedding-001` at 768 dims, int8-quantised (~1.7 MB for the whole corpus), and the Worker
+fuses the semantic ranking with the lexical one by reciprocal rank fusion - no score normalisation,
+because a cosine and a LIKE count are not comparable units. Semantic mode switches on only at ≥99%
+coverage, because half-embedded results that differ per meeting are worse than honest keywords; the
+Search page badges whichever mode answered.
+
+The embedding build is **resumable and quota-gated**: Gemini's free embedding quota allows roughly one
+100-segment batch a minute, and it was exhausted at 900/2,178 during this build. Re-run
+`GEMINI_API_KEY=… node scripts/build-embeddings.mjs --max-seconds 600` (repeat; it skips what is
+banked), then `npx wrangler d1 execute fathom-db --remote --file=db/embeddings.sql`, and hybrid search
+switches itself on with no code change.
+
 **Ask is retrieval-based, not semantic.** TF-IDF over stemmed terms, an exact-phrase bonus, and an
 intent lexicon (`shared/ai/expand.mjs`) that adds the vocabulary answering a recognised intent at 0.4
 weight. That closes a specific and useful slice of the gap — "did anyone commit to a date" now finds
 "we will have the full response by the fourteenth of October" — but it is a lexicon I wrote by hand,
 bounded by what I thought of. Embeddings would generalise it and are the first thing I would add.
 
-It is also **one question, one answer**: no follow-up conversation, which real Ask Fathom has.
+Ask also holds a conversation now (follow-ups carry the thread), and two correction features cover the
+case where capture was wrong: rename a speaker from the People tab (updates transcript, avatars and
+talk time together) and correct any line inline (marked `edited`, because a corrected transcript that
+hides its corrections is worse than one that shows them).

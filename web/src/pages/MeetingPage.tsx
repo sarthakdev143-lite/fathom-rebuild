@@ -101,6 +101,8 @@ export default function MeetingPage() {
   const [askThread, setAskThread] = useState<{ q: string; res: any }[]>([]);
   const [askBusy, setAskBusy] = useState(false);
   const [suggested, setSuggested] = useState<string[]>([]);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
   const [showTs, setShowTs] = useState(true);
   const [compact, setCompact] = useState(false);
   const narrow = useIsNarrow();
@@ -335,6 +337,30 @@ export default function MeetingPage() {
     setData({ ...data, action_items: data.action_items.map((a) => (a.id === actionId ? { ...a, done: done ? 1 : 0 } : a)) });
   };
 
+  const saveCorrection = async (segId: number) => {
+    const text = editText.trim();
+    setEditId(null);
+    if (!text || !data) return;
+    const orig = segments.find((s) => s.id === segId);
+    if (!orig || orig.text === text) return;
+    try {
+      await api.correctSegment(segId, text);
+      setSegments((prev) => prev.map((s) => (s.id === segId ? { ...s, text, edited: 1 } : s)));
+      flash("Line corrected - marked as edited in the transcript");
+    } catch (e: any) { flash(`Correction failed: ${e.message}`); }
+  };
+
+  const renameSpeaker = async (speakerId: string, current: string) => {
+    const name = window.prompt(`Rename "${current}" everywhere in this meeting:`, current);
+    if (!name || name.trim() === current || !data) return;
+    try {
+      await api.renameSpeaker(id, speakerId, name.trim());
+      const d = await api.meeting(id);
+      setData(d);
+      flash(`Renamed ${current} to ${name.trim()} across transcript, people and talk time`);
+    } catch (e: any) { flash(`Rename failed: ${e.message}`); }
+  };
+
   const addHighlight = async (start: number, label?: string) => {
     if (!data) return;
     const end = Math.min(start + 30000, durationMs);
@@ -515,6 +541,13 @@ export default function MeetingPage() {
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.speaker_color }} />
                         <span className="truncate text-[12px] font-semibold" style={{ color: s.speaker_color }}>{s.speaker_name}</span>
                       </span>
+                      {editId === s.id ? (
+                        <input autoFocus value={editText} onChange={(e) => setEditText(e.target.value)}
+                               onBlur={() => saveCorrection(s.id)}
+                               onKeyDown={(e) => { if (e.key === "Enter") saveCorrection(s.id); if (e.key === "Escape") setEditId(null); }}
+                               className="focus-ring flex-1 px-2 py-1 rounded-md border border-accent/50 bg-white text-[13px]" />
+                      ) : (
+                      <>
                       <p className={`flex-1 leading-[1.6] ${compact ? "text-[12.5px]" : "text-[13px]"} ${active ? "text-ink-900" : "text-ink-700"}`}>
                         {mark(s.text)}
                         {s.is_crosstalk === 1 && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-ink-400" title="overlapping speech">[overlap]</span>}
@@ -522,9 +555,17 @@ export default function MeetingPage() {
                           <span className="ml-1.5 text-[10px] uppercase tracking-wide text-amber-600" title={`ASR confidence ${(s.confidence * 100).toFixed(0)}%`}>[low conf]</span>
                         )}
                       </p>
+                      {s.edited === 1 && (
+                        <span className="shrink-0 text-[9.5px] uppercase tracking-wide text-emerald-600" title="a human corrected this line">edited</span>
+                      )}
+                      <button onClick={() => { setEditId(s.id); setEditText(s.text); }}
+                              className="seg-actions focus-ring shrink-0 text-[10.5px] text-ink-400 hover:text-accent transition-colors"
+                              title="Correct this line">✎</button>
                       <button onClick={() => addHighlight(s.start_ms)}
                               className="seg-actions focus-ring shrink-0 text-[10.5px] text-ink-400 hover:text-amber-600 transition-colors"
                               title="Highlight from here">★</button>
+                      </>
+                      )}
                     </div>
                   </div>
                 );
@@ -809,6 +850,9 @@ export default function MeetingPage() {
                         </div>
                         <div className="text-[11px] text-ink-500 truncate">{p.role || ""}{p.company ? ` · ${p.company}` : ""}</div>
                       </div>
+                      <button onClick={() => renameSpeaker(sp?.id || "", p.person_name)}
+                              className="focus-ring shrink-0 text-[10.5px] text-ink-400 hover:text-accent transition-colors px-1"
+                              title="Rename this speaker everywhere in the meeting">rename</button>
                       <div className="shrink-0 text-right">
                         <div className="text-[11.5px] tabular-nums text-ink-700">{sp ? fmtClock(sp.talk_ms) : "—"}</div>
                         <div className="w-14 h-1 rounded-full bg-ink-100 mt-1 overflow-hidden">

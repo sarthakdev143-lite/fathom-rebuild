@@ -238,3 +238,35 @@ test("action items get owners, spoken due dates and a timestamp", () => {
   assert.ok(dated, "expected a due date to be picked up");
   assert.ok(items.every((a) => typeof a.start_ms === "number"));
 });
+
+// ---- embedding math -------------------------------------------------------
+import { quantizeInt8, fromHex, toHex, similarity, rrfMerge, semanticReady } from "../shared/ai/embed.mjs";
+
+test("int8 quantisation preserves cosine ordering", () => {
+  const a = [1, 2, 3, 4, 5, 6, 7, 8].map((x) => x / 10);
+  const near = [1.1, 2, 3, 4, 5, 6, 7, 8].map((x) => x / 10);
+  const far = [8, 7, 6, 5, 4, 3, 2, 1].map((x) => x / 10);
+  const qa = quantizeInt8(a), qn = quantizeInt8(near), qf = quantizeInt8(far);
+  assert.ok(similarity(qa, qn) > similarity(qa, qf), "near must outrank far after quantisation");
+  assert.ok(similarity(qa, qn) > 0.98, `expected ~1.0, got ${similarity(qa, qn)}`);
+});
+
+test("hex round-trip is lossless for int8 vectors", () => {
+  const q = quantizeInt8([0.1, -0.7, 0.4, 0.9, -0.2, 0.05, 0.33, -0.51]);
+  const back = fromHex(toHex(q));
+  assert.deepEqual([...back], [...q]);
+});
+
+test("rrf fusion ranks an item both lists agree on above either list's sole favourite", () => {
+  const lex = [{ key: "a" }, { key: "shared" }, { key: "b" }];
+  const sem = [{ key: "c" }, { key: "shared" }, { key: "d" }];
+  const fused = rrfMerge([lex, sem], 60, 10);
+  assert.equal(fused[0].key, "shared", "agreement between rankers should win");
+});
+
+test("semantic ranking stays off until the corpus is essentially fully embedded", () => {
+  assert.equal(semanticReady(0, 2178), false);
+  assert.equal(semanticReady(900, 2178), false, "partial coverage must not switch modes");
+  assert.equal(semanticReady(2178, 2178), true);
+  assert.equal(semanticReady(2170, 2178), true, "a handful of missing rows is tolerable");
+});

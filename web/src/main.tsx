@@ -397,7 +397,14 @@ function SearchPage() {
           <p className="text-[12px] text-ink-500 mt-2.5">
             <strong className="text-ink-800 tabular-nums">{res.total}</strong> hits across{" "}
             <strong className="text-ink-800 tabular-nums">{res.meetings.length}</strong> meetings
-            <span className="text-ink-400"> · scans 2,178 transcript lines, no FTS index</span>
+            <span className={`ml-2 px-1.5 py-0.5 rounded border text-[10px] uppercase tracking-wider font-semibold ${res.mode === "hybrid" ? "border-accent/40 bg-accent-soft text-accent" : "border-ink-200 bg-white text-ink-500"}`}>
+              {res.mode === "hybrid" ? "semantic + lexical" : "lexical"}
+            </span>
+            {res.mode !== "hybrid" && (
+              <span className="text-ink-400" title="Embedding the corpus is a resumable build step gated by Gemini's free embedding quota">
+                {" "}· corpus not embedded yet, so this is keyword ranking
+              </span>
+            )}
           </p>
         )}
       </header>
@@ -484,6 +491,9 @@ function SearchPage() {
                       className="focus-ring w-full text-left rounded-lg border border-ink-200 bg-white px-4 py-3 hover:border-accent/45 transition-colors fade-up">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`text-[9.5px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded ${KIND[h.kind] || KIND.transcript}`}>{h.kind}</span>
+                  {h.source && h.source !== "lexical" && (
+                    <span className="text-[9.5px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-accent-soft text-accent">{h.source}</span>
+                  )}
                   <span className="text-[12px] font-medium text-ink-800 truncate">{h.meeting_title}</span>
                   {h.start_ms != null && <span className="text-[11px] text-ink-400 tabular-nums ml-auto shrink-0">{new Date(h.start_ms).toISOString().substr(14, 5)}</span>}
                 </div>

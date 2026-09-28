@@ -91,8 +91,11 @@ Two places where it is **worse**, stated plainly:
    falls back to plain lexical matching. With a Groq or Gemini key configured it composes prose over the
    same cited passages; without one it is honest about being lexical. Embeddings are the missing piece
    and the first thing I would add.
-2. **Search is lexical too.** Searching "did anyone commit to a date" will not find "we will have the
-   full response by the fourteenth of October" unless you search the words.
+2. **Search is lexical-first.** A semantic layer exists and is wired (hybrid RRF over int8 Gemini
+   embeddings), but the corpus was only 900/2,178 embedded when Gemini's free embedding quota ran out,
+   and semantic mode refuses to switch on below 99% coverage. So today, searching "did anyone commit to
+   a date" finds the October line via the intent lexicon, not via meaning. Finishing the embedding build
+   is one resumable command, documented in the README.
 
 A third, smaller one: **Ask has no conversation.** Real Ask Fathom is a chat with follow-ups; mine is
 one question, one cited answer. Statefulness was cut to get the citation quality right first.

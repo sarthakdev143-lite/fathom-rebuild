@@ -28,6 +28,7 @@ secrets.json
 media/voices/
 media/local/
 *.wav
+db/embeddings.progress.json
 
 # The synthesized MP3s under web/public/media/ ARE committed on purpose: they are
 # the meeting audio the deployed app plays, they total ~54 MB, and committing them

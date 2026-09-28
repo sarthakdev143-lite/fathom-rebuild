@@ -113,10 +113,12 @@ CREATE TABLE segments (
   speaker_id  TEXT NOT NULL REFERENCES speakers(id),
   start_ms    INTEGER NOT NULL,
   end_ms      INTEGER NOT NULL,
+  ord         INTEGER NOT NULL DEFAULT 0,   -- index within its meeting; the stable key embeddings hang off
   text        TEXT NOT NULL,
   words       INTEGER NOT NULL DEFAULT 0,
   is_crosstalk INTEGER NOT NULL DEFAULT 0,   -- overlapping speech
   is_filler    INTEGER NOT NULL DEFAULT 0,   -- "um", "you know"
+  edited       INTEGER NOT NULL DEFAULT 0,   -- a human corrected this line
   confidence   REAL NOT NULL DEFAULT 0.97
 );
 CREATE INDEX idx_segments_window ON segments(meeting_id, start_ms);
@@ -204,6 +206,17 @@ CREATE INDEX idx_share_meeting ON share_links(meeting_id);
 
 -- Derived at seed time from the authored beats, so the transcript is navigable
 -- by topic instead of being one 4,700-row scroll.
+-- Int8-quantised unit vectors, 768 dims, one per segment. ~770 bytes a row, so the
+-- whole corpus is ~1.7 MB - small enough to hold in an isolate-level cache and scan
+-- in milliseconds, which is what makes semantic search free at request time.
+CREATE TABLE segment_embeddings (
+  meeting_id  TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+  ord         INTEGER NOT NULL,
+  vec         BLOB NOT NULL,
+  model       TEXT NOT NULL,
+  PRIMARY KEY (meeting_id, ord)
+);
+
 CREATE TABLE chapters (
   id          TEXT PRIMARY KEY,
   meeting_id  TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,

@@ -11,6 +11,7 @@ import { TEMPLATES, DEFAULT_TEMPLATE } from "../../shared/ai/templates.mjs";
 import { generateSummary } from "../../shared/ai/summarize.mjs";
 import { ask, retrieve, composeFromRetrieval, STOPWORDS } from "../../shared/ai/ask.mjs";
 import { transcribeAudio, parseTranscript } from "../../shared/ai/transcribe.mjs";
+import { fromBytes, similarity, rrfMerge, quantizeInt8, semanticReady } from "../../shared/ai/embed.mjs";
 import { createMeetingFromSegments } from "./meetings";
 import { expandQuery, splitExpansions } from "../../shared/ai/expand.mjs";
 
@@ -210,7 +211,7 @@ app.get("/api/meetings/:id/transcript", async (c) => {
   const from = Number(c.req.query("from") || 0);
   const limit = Math.min(Number(c.req.query("limit") || 400), 2000);
   const { results } = await c.env.DB.prepare(
-    `SELECT g.id, g.start_ms, g.end_ms, g.text, g.words, g.is_crosstalk, g.confidence,
+    `SELECT g.id, g.start_ms, g.end_ms, g.text, g.words, g.is_crosstalk, g.confidence, g.edited,
             s.name AS speaker_name, s.color AS speaker_color
      FROM segments g JOIN speakers s ON s.id = g.speaker_id
      WHERE g.meeting_id = ?1 AND g.start_ms >= ?2
@@ -279,6 +280,34 @@ app.patch("/api/action-items/:id", async (c) => {
   if (!sets.length) return json({ error: "nothing to update" }, { status: 400 });
   await c.env.DB.prepare(`UPDATE action_items SET ${sets.join(", ")} WHERE id = ?1`).bind(id, ...vals).run();
   return json({ ok: true, id });
+});
+
+// ---- corrections: what a user reaches for after a bad diarisation ----------
+// Renaming a speaker updates the voice row and every participant row carrying the
+// old name, so avatar stack, talk-time list and transcript agree afterwards.
+app.patch("/api/meetings/:id/speakers/:speakerId", async (c) => {
+  const name = String(((await c.req.json().catch(() => ({}))) as { name?: string }).name || "").trim();
+  if (!name || name.length > 60) return json({ error: "name required (<=60 chars)" }, { status: 400 });
+  const sp = (await c.env.DB.prepare(`SELECT * FROM speakers WHERE id = ?1 AND meeting_id = ?2`)
+    .bind(c.req.param("speakerId"), c.req.param("id")).first()) as any;
+  if (!sp) return notFound("speaker");
+  const old = sp.name as string;
+  await c.env.DB.prepare(`UPDATE speakers SET name = ?1 WHERE id = ?2`).bind(name, sp.id).run();
+  await c.env.DB.prepare(`UPDATE participants SET person_name = ?1 WHERE meeting_id = ?2 AND person_name = ?3`)
+    .bind(name, c.req.param("id"), old).run();
+  return json({ ok: true, renamed_from: old, name });
+});
+
+// Correcting a line marks it edited and the transcript says so. A corrected
+// transcript that hides its corrections is worse than one that shows them.
+app.patch("/api/segments/:id", async (c) => {
+  const text = String(((await c.req.json().catch(() => ({}))) as { text?: string }).text || "").trim();
+  if (!text) return json({ error: "text required" }, { status: 400 });
+  const seg = (await c.env.DB.prepare(`SELECT id FROM segments WHERE id = ?1`).bind(c.req.param("id")).first()) as any;
+  if (!seg) return notFound("segment");
+  await c.env.DB.prepare(`UPDATE segments SET text = ?2, words = ?3, edited = 1 WHERE id = ?1`)
+    .bind(seg.id, text, text.split(/\s+/).filter(Boolean).length).run();
+  return json({ ok: true, id: seg.id, edited: true });
 });
 
 // ---- highlights -----------------------------------------------------------
@@ -402,14 +431,51 @@ app.get("/api/search", async (c) => {
      LIMIT 60`
   ).bind(like).all();
 
-  const hits = [...(metaHits.results || []) as any[], ...(segHits.results || []).map((h: any) => ({ ...h, kind: "transcript" }))];
+  const lexical = [
+    ...((metaHits.results || []) as any[]),
+    ...((segHits.results || []) as any[]).map((h) => ({ ...h, kind: "transcript" })),
+  ];
+
+  // Hybrid: reciprocal-rank fusion of the lexical and semantic rankings. RRF needs
+  // no score normalisation, which matters because a LIKE hit count and a cosine are
+  // not the same kind of number, and pretending otherwise is how hybrid search gets
+  // silently miscalibrated.
+  const mode = c.req.query("mode") || "auto";
+  const sem = mode === "lexical" ? { ready: false, hits: [] as any[] } : await semanticTop(c.env, q, 60);
+  let merged: any[] = lexical.slice(0, 100);
+  if (sem.hits.length) {
+    const binds: unknown[] = [];
+    const conds = sem.hits.map((h, i) => { binds.push(h.meeting_id, h.ord); return `(g.meeting_id = ?${i * 2 + 1} AND g.ord = ?${i * 2 + 2})`; });
+    const { results } = await c.env.DB.prepare(
+      `SELECT g.meeting_id, g.start_ms, g.end_ms, g.text, g.is_crosstalk, g.confidence,
+              s.name AS speaker_name, s.color AS speaker_color, m.title AS meeting_title, m.started_at, m.duration_ms
+       FROM segments g JOIN speakers s ON s.id = g.speaker_id JOIN meetings m ON m.id = g.meeting_id
+       WHERE ${conds.join(" OR ")} ORDER BY g.meeting_id, g.start_ms`
+    ).bind(...binds).all();
+    const semanticHits = (results || []) as any[];
+    const keyOf = (h: any) => `${h.meeting_id}:${h.start_ms}`;
+    const lexRanked = lexical.filter((h) => h.kind === "transcript").map((h) => ({ key: keyOf(h), ...h }));
+    const semRanked = semanticHits.map((h, i) => ({ key: keyOf(h), ...h, sem_score: sem.hits[i]?.score ?? 0 }));
+    const lexKeys = new Set(lexRanked.map((l) => l.key));
+    const semKeys = new Set(semRanked.map((l) => l.key));
+    const fused = rrfMerge([semRanked, lexRanked], 60, 100);
+    const metaOnly = lexical.filter((h) => h.kind !== "transcript");
+    merged = [...metaOnly, ...fused.map((f) => ({
+      ...f,
+      kind: f.kind || "transcript",
+      source: lexKeys.has(f.key) && semKeys.has(f.key) ? "both" : lexKeys.has(f.key) ? "lexical" : "semantic",
+    }))];
+  }
+
   const byMeeting = new Map<string, number>();
-  for (const h of hits) byMeeting.set(h.meeting_id, (byMeeting.get(h.meeting_id) || 0) + 1);
+  for (const h of merged) byMeeting.set(h.meeting_id, (byMeeting.get(h.meeting_id) || 0) + 1);
 
   return json({
     query: q,
-    total: hits.length,
-    hits: hits.slice(0, 100),
+    mode: sem.hits.length ? "hybrid" : "lexical",
+    semantic_ready: sem.ready,
+    total: merged.length,
+    hits: merged.slice(0, 100),
     meetings: [...byMeeting.entries()].map(([meeting_id, count]) => ({ meeting_id, count })).sort((a, b) => b.count - a.count),
   });
 });
@@ -442,6 +508,67 @@ app.patch("/api/calendar/events/:id", async (c) => {
     .bind(c.req.param("id"), b.notetaker_status || "scheduled").run();
   return json({ ok: true });
 });
+
+// ---- semantic layer -------------------------------------------------------
+// Int8 vectors for the whole corpus are ~1.7 MB, so they are loaded once per
+// isolate and cached for five minutes; ranking 2,178 of them is a couple of
+// milliseconds. When the corpus is not (yet) embedded - the free embedding quota
+// is a batch a minute, and it is a resumable build step - semanticReady() keeps
+// the app honestly lexical instead of half-semantic.
+let vecCache: { rows: { key: string; meeting_id: string; ord: number; vec: Int8Array }[]; at: number; coverage: number } | null = null;
+
+async function vectors(env: Env) {
+  if (vecCache && Date.now() - vecCache.at < 300000) return vecCache;
+  const [vecs, tot] = await Promise.all([
+    env.DB.prepare(`SELECT meeting_id, ord, vec FROM segment_embeddings`).all(),
+    env.DB.prepare(`SELECT COUNT(*) AS c FROM segments`).first(),
+  ]);
+  const rows = ((vecs.results || []) as any[]).map((r) => ({
+    key: `${r.meeting_id}:${r.ord}`,
+    meeting_id: r.meeting_id,
+    ord: r.ord,
+    vec: fromBytes(r.vec),
+  }));
+  vecCache = { rows, at: Date.now(), coverage: rows.length / Math.max(1, (tot as any)?.c || 1) };
+  return vecCache;
+}
+
+async function embedQuery(env: Env, text: string): Promise<Int8Array | null> {
+  if (!env.GEMINI_API_KEY) return null;
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model: "models/gemini-embedding-001",
+          content: { parts: [{ text }] },
+          outputDimensionality: 768,
+        }),
+      }
+    );
+    if (!res.ok) return null;
+    const d: any = await res.json();
+    const vals = d?.embedding?.values;
+    return vals ? quantizeInt8(vals) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function semanticTop(env: Env, question: string, limit = 60) {
+  const cache = await vectors(env);
+  const total = (await env.DB.prepare(`SELECT COUNT(*) AS c FROM segments`).first()) as any;
+  if (!semanticReady(cache.rows.length, total?.c || 0)) return { ready: false, hits: [] as any[] };
+  const q = await embedQuery(env, question);
+  if (!q) return { ready: true, hits: [] as any[] };
+  const scored = cache.rows
+    .map((r) => ({ ...r, score: similarity(q, r.vec) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+  return { ready: true, hits: scored };
+}
 
 // ---- ask: question answering over the corpus ------------------------------
 // The feature my own recon named as the biggest omission from real Fathom.
@@ -495,7 +622,22 @@ app.post("/api/ask", async (c) => {
     meetingTitle = m.title;
   }
 
-  const passages = await candidatePassages(c.env, question, meetingId);
+  const lexPassages = await candidatePassages(c.env, question, meetingId);
+  const sem = await semanticTop(c.env, question, 60);
+  let passages = lexPassages;
+  if (sem.hits.length) {
+    const ph = sem.hits.map((_, i) => `?${i + 1}`).join(",");
+    const binds: unknown[] = [];
+    const conds = sem.hits.map((h, i) => { binds.push(h.meeting_id, h.ord); return `(meeting_id = ?${i * 2 + 1} AND ord = ?${i * 2 + 2})`; });
+    const { results } = await c.env.DB.prepare(
+      `SELECT g.meeting_id, g.start_ms, g.end_ms, g.text, g.is_crosstalk,
+              s.name AS speaker_name, s.color AS speaker_color, m.title AS meeting_title
+       FROM segments g JOIN speakers s ON s.id = g.speaker_id JOIN meetings m ON m.id = g.meeting_id
+       WHERE ${conds.join(" OR ")}`
+    ).bind(...binds).all();
+    const have = new Set(lexPassages.map((p: any) => `${p.meeting_id}:${p.start_ms}`));
+    passages = [...lexPassages, ...((results || []) as any[]).filter((r) => !have.has(`${r.meeting_id}:${r.start_ms}`))];
+  }
   const settings = await getSettings(c.env);
   // "retrieval" forces the cited, key-free path even when a model key is present,
   // so the two behaviours can be compared side by side.
@@ -515,6 +657,9 @@ app.post("/api/ask", async (c) => {
     ...out,
     concepts: out.concepts || [],
     passages_considered: passages.length,
+    lexical_candidates: lexPassages.length,
+    semantic_candidates: sem.hits.length,
+    semantic_ready: sem.ready,
     ask_use_model: settings.ask_use_model,
   });
 });
