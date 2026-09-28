@@ -811,7 +811,13 @@ app.get("/api/live-asr", (c) => {
   });
   gemini.addEventListener("error", () => send({ type: "error", message: "the Gemini Live connection failed" }));
   void client;
-  gemini.addEventListener("close", () => { send({ type: "closed" }); try { server.close(); } catch { /* already */ } });
+  // Forward the close code and reason. A silent close is exactly what made the
+  // real-meeting failure undiagnosable from the client: the socket opened, audio
+  // flowed, and nothing ever came back.
+  gemini.addEventListener("close", (ev: any) => {
+    send({ type: "closed", code: ev?.code, reason: String(ev?.reason || "").slice(0, 160) });
+    try { server.close(); } catch { /* already */ }
+  });
 
   server.addEventListener("message", (ev: any) => {
     let d: any;

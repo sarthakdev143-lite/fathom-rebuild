@@ -18,6 +18,41 @@ function toPcm16(input: Float32Array, fromRate: number, toRate = 16000): Int16Ar
   return out;
 }
 
+// The guaranteed path. Gemini's Live socket can die silently (quota, model
+// availability, a handshake nobody documents), and a meeting is not repeatable -
+// so every capture also RECORDS its audio locally with MediaRecorder. If live
+// finals arrive they are used; if they do not, the recording is transcribed on
+// stop with the batch model, the path verified at 95.2% word F1. A meeting must
+// never end in "nothing was transcribed" when audio was captured.
+function attachRecorder(stream: MediaStream) {
+  const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"]
+    .find((m) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m));
+  if (!mime) return null;
+  const rec = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 32000 });
+  const chunks: Blob[] = [];
+  rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  rec.start(1000);
+  return {
+    rec,
+    blob: () => new Promise<Blob | null>((resolve) => {
+      if (rec.state === "inactive") { resolve(new Blob(chunks, { type: mime })); return; }
+      rec.onstop = () => resolve(new Blob(chunks, { type: mime }));
+      rec.stop();
+    }),
+  };
+}
+
+async function uploadRecording(blob: Blob, durationMs: number, title: string) {
+  const form = new FormData();
+  form.append("file", blob, `recording-${Date.now()}.webm`);
+  form.append("duration_ms", String(durationMs));
+  form.append("title", title);
+  const res = await fetch("/api/upload", { method: "POST", body: form });
+  const d: any = await res.json();
+  if (!res.ok) throw new Error(d.error || res.statusText);
+  return d;
+}
+
 const b64 = (i16: Int16Array) => {
   let bin = "";
   const u8 = new Uint8Array(i16.buffer);
@@ -54,8 +89,8 @@ export default function LivePage() {
   const [interim, setInterim] = useState("");
   const [finals, setFinals] = useState<{ at: number; text: string }[]>([]);
   const [micErr, setMicErr] = useState<string | null>(null);
-  const micRef = useRef<{ ws: WebSocket; ctx: AudioContext; stream: MediaStream; node: ScriptProcessorNode } | null>(null);
-  const tabRef = useRef<{ ws: WebSocket; ctx: AudioContext; stream: MediaStream; node: ScriptProcessorNode } | null>(null);
+  const micRef = useRef<{ ws: WebSocket; ctx: AudioContext; stream: MediaStream; node: ScriptProcessorNode; rec: any } | null>(null);
+  const tabRef = useRef<{ ws: WebSocket; ctx: AudioContext; stream: MediaStream; node: ScriptProcessorNode; rec: any } | null>(null);
   const [tabFinals, setTabFinals] = useState<{ at: number; text: string }[]>([]);
   const [tabInterim, setTabInterim] = useState("");
   const [tabErr, setTabErr] = useState<string | null>(null);
@@ -157,7 +192,7 @@ export default function LivePage() {
     ws.onerror = () => { setTab("error"); setTabErr("the live transcription socket failed"); };
     // If the user stops sharing from the browser UI, end cleanly.
     audioStream.getAudioTracks()[0].addEventListener("ended", () => stopTabAudio());
-    tabRef.current = { ws, ctx, stream, node };
+    tabRef.current = { ws, ctx, stream, node, rec: attachRecorder(audioStream) as any };
   };
 
   const stopTabAudio = async () => {
@@ -168,9 +203,25 @@ export default function LivePage() {
     m.stream.getTracks().forEach((t) => t.stop());
     m.ctx.close().catch(() => {});
     m.ws.close();
+    const duration = Date.now() - startedAtRef.current;
+    const blobPromise = (m as any).rec ? (m as any).rec.blob() : Promise.resolve(null);
     tabRef.current = null;
     setTab("idle"); setTabInterim("");
-    if (!tabFinals.length) { setTabErr("Nothing was transcribed from the tab audio."); return; }
+    if (!tabFinals.length) {
+      // No live finals: transcribe the local recording instead. This is what turns
+      // "nothing was transcribed" into an actual meeting.
+      const blob = await blobPromise;
+      if (!blob || blob.size < 2000) { setTabErr("Nothing was captured - the tab produced no audio."); return; }
+      setTabErr(null);
+      setLog((l) => [...l, `${new Date().toLocaleTimeString()} - live stream produced nothing; transcribing the ${Math.round(duration / 1000)}s recording instead`]);
+      try {
+        const d = await uploadRecording(blob, duration, `Tab audio capture - ${new Date().toLocaleString("en-GB")}`);
+        window.location.href = `/meetings/${d.id}`;
+      } catch (e: any) {
+        setTabErr(`Live transcription produced nothing and the recording could not be transcribed: ${e.message}`);
+      }
+      return;
+    }
     const segments = tabFinals.map((f, i) => ({
       speaker: "Speaker 1",
       text: f.text,
@@ -228,7 +279,7 @@ export default function LivePage() {
       if (d.type === "error") { setMic("error"); setMicErr(d.message); }
     };
     ws.onerror = () => { setMic("error"); setMicErr("the live transcription socket failed"); };
-    micRef.current = { ws, ctx, stream, node };
+    micRef.current = { ws, ctx, stream, node, rec: attachRecorder(stream) as any };
   };
 
   const stopMic = async () => {
@@ -239,10 +290,27 @@ export default function LivePage() {
     m.stream.getTracks().forEach((t) => t.stop());
     m.ctx.close().catch(() => {});
     m.ws.close();
+    const duration = Date.now() - startedAtRef.current;
+    const blobPromise = (m as any).rec ? (m as any).rec.blob() : Promise.resolve(null);
     micRef.current = null;
     setMic("idle");
     setInterim("");
-    if (!finals.length) { setMicErr("Nothing was transcribed - the recording ended before any speech was finalised."); return; }
+    if (!finals.length) {
+      const blob = await blobPromise;
+      if (blob && blob.size > 2000) {
+        setLog((l) => [...l, `${new Date().toLocaleTimeString()} - live stream produced nothing; transcribing the ${Math.round(duration / 1000)}s recording instead`]);
+        try {
+          const d = await uploadRecording(blob, duration, `Microphone recording - ${new Date().toLocaleString("en-GB")}`);
+          window.location.href = `/meetings/${d.id}`;
+          return;
+        } catch (e: any) {
+          setMicErr(`Nothing was transcribed live, and the recording could not be transcribed: ${e.message}`);
+          return;
+        }
+      }
+      setMicErr("Nothing was transcribed - the recording ended before any speech was finalised.");
+      return;
+    }
     const segments = finals.map((f, i) => ({
       speaker: "Speaker 1",
       text: f.text,
@@ -332,6 +400,8 @@ export default function LivePage() {
                   <span className="font-mono text-[11px]"> gemini-3.5-transcribe-live</span> over the Live API. The key
                   never reaches the browser. Interim hypotheses appear as you speak; finalised lines are saved as a
                   real meeting when you stop. Nothing is simulated on this path.
+                  <strong> And if the live stream produces nothing, the recording is transcribed on stop instead</strong> -
+                  a meeting must never end in "nothing was transcribed" when audio was captured.
                 </p>
               )}
               <p className="text-[11.5px] text-ink-400 mt-3 leading-relaxed">
