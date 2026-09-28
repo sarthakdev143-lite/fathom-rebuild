@@ -149,6 +149,12 @@ def residual_secrets(text: str) -> list[str]:
         key, val = m.group(1), m.group(2)
         if key.lower() in NON_SECRET_KEYS or "REDACTED" in val:
             continue
+        # A bare URL on its own line is not a credential: "https:" parses as a key
+        # and "//github.com/..." as a 46-char opaque value. This false-positive
+        # refused to write an entire turn's response. Real DB URLs with embedded
+        # passwords are already stripped by DB_URL before this gate runs.
+        if val.startswith("//") or "://" in val or key.lower() in ("http", "https", "url", "href", "link", "repo", "repository"):
+            continue
         classes = sum([any(c.islower() for c in val),
                        any(c.isupper() for c in val),
                        any(c.isdigit() for c in val)])
