@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import json
 import os
 import subprocess
@@ -238,6 +239,13 @@ def synthesize_meeting(meeting_id: str, voice_cache: dict[str, Path], verbose: b
     del pcm
     gc.collect()
 
+    # A sidecar hash of the transcript this audio was built from. Duration alone is
+    # NOT enough for --only-stale: adding an authored beat can leave the calibrated
+    # duration identical while changing every line after it, and duration-only
+    # staleness silently kept old audio for four meetings.
+    stamp = hashlib.sha256(json.dumps(data["segments"], sort_keys=True).encode()).hexdigest()
+    (OUT_DIR / f"{meeting_id}.stamp").write_text(stamp + "\n")
+
     mp3_path = OUT_DIR / f"{meeting_id}.mp3"
     import imageio_ffmpeg
     ff = imageio_ffmpeg.get_ffmpeg_exe()
@@ -283,19 +291,15 @@ def main() -> None:
         if args.only_stale:
             data0 = json.loads((SEG_DIR / f"{mid}.json").read_text())
             mp3 = OUT_DIR / f"{mid}.mp3"
-            if mp3.exists():
-                import subprocess as _sp
-                import imageio_ffmpeg as _iff
-                out = _sp.run([_iff.get_ffmpeg_exe(), "-i", str(mp3)], capture_output=True, text=True)
-                import re as _re
-                m = _re.search(r"Duration: (\d+):(\d+):([\d.]+)", out.stderr)
-                if m:
-                    secs = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
-                    want = data0["duration_ms"] / 1000 + 1.0  # the deliberate 1s tail
-                    if abs(secs - want) <= 1.6:
-                        print(f"  skip {mid}: audio already matches transcript ({secs/60:.1f}m)")
-                        targets.remove(mid)
-                        continue
+            stampfile = OUT_DIR / f"{mid}.stamp"
+            want = hashlib.sha256(json.dumps(data0["segments"], sort_keys=True).encode()).hexdigest()
+            if stampfile.exists() and stampfile.read_text().strip() == want and mp3.exists():
+                print(f"  skip {mid}: audio matches transcript content and duration")
+                targets.remove(mid)
+                continue
+            # No stamp, or a stamp that does not match: re-synthesize. Duration is
+            # deliberately NOT consulted here - identical durations hid four stale
+            # recordings once already.
     for mid in targets:
         data = json.loads((SEG_DIR / f"{mid}.json").read_text())
         mins = data["duration_ms"] / 60000

@@ -12,6 +12,7 @@
 
 PRAGMA foreign_keys = ON;
 
+DROP TABLE IF EXISTS segment_embeddings;
 DROP TABLE IF EXISTS settings;
 DROP TABLE IF EXISTS chapters;
 DROP TABLE IF EXISTS share_views;

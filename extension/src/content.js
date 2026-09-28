@@ -213,6 +213,7 @@
       const heur = document.querySelector('[aria-live="polite"][role="log"], [class*="caption" i], [class*="subtitle" i]');
       if (heur && (heur.innerText || "").trim()) return attach(heur, false);
       session.containerFound = false;
+      session.searchingSince = session.searchingSince || Date.now();
       report();
       setTimeout(findContainer, 4000); // captions appear only once someone speaks
     });
@@ -242,6 +243,7 @@
       platform: platform.id,
       url: location.href,
       containerFound: session.containerFound,
+      searchingFor: session.startedAt ? 0 : Math.round((Date.now() - (session.searchingSince || Date.now())) / 1000),
       usingCustomSelector: session.usingCustomSelector,
       lines: session.lines.length,
       interim: session.interim?.text || null,

@@ -112,3 +112,10 @@ body {
 /* ---- transcript rows ------------------------------------------------------ */
 .seg-row { border-left: 2px solid transparent; }
 .seg-row.active-row { border-left-color: var(--row-color, var(--color-accent)); background: color-mix(in srgb, var(--row-color, var(--color-accent)) 7%, #fff); }
+
+/* Respect reduced-motion: the pulse/wave/fade animations are feedback, not content,
+   so losing them must not lose meaning. */
+@media (prefers-reduced-motion: reduce) {
+  .fade-up, .pulse-dot, .wave-bar, .speaking-dot { animation: none !important; }
+  * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}

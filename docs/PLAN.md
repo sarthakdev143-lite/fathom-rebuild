@@ -91,7 +91,7 @@ Eight meetings, deliberately spanning the shapes that stress different parts:
 | Solo test call | 2 min, 1 speaker | The onboarding path the brief describes |
 | 1:1 customer call | 23 min, 2 speakers | Sales template, action items |
 | Candidate interview | 41 min, 3 speakers | Interview template, scorecard-style summary |
-| Product design review | 33 min, 5 speakers | Crosstalk, overlapping speech |
+| Product design review | 34 min, 5 speakers | Crosstalk, overlapping speech |
 | **Weekly leadership sync** | **61 min, 8 speakers** | **The case that matters** |
 | All-hands | 47 min, 6 speakers | Long monologue segments, chapters |
 | Quick standup | 9 min, 6 speakers | Short-form, high speaker turnover |

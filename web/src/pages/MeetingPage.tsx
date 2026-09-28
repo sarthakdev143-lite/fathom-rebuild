@@ -47,7 +47,13 @@ function Waveform({ peaks, durationMs, currentMs, chapters, highlights, onSeek }
     </svg>
   );
   return (
-    <div className="wave" data-testid="waveform"
+    <div className="wave" data-testid="waveform" role="slider" aria-label="Recording timeline"
+         aria-valuemin={0} aria-valuemax={Math.round(durationMs / 1000)} aria-valuenow={Math.round(currentMs / 1000)}
+         tabIndex={0}
+         onKeyDown={(e) => {
+           if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); onSeek(currentMs + 10000); }
+           if (e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); onSeek(currentMs - 10000); }
+         }}
          onClick={(e) => {
            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
            onSeek(((e.clientX - r.left) / r.width) * durationMs);
@@ -569,9 +575,11 @@ export default function MeetingPage() {
                         <span className="shrink-0 text-[9.5px] uppercase tracking-wide text-emerald-600" title="a human corrected this line">edited</span>
                       )}
                       <button onClick={() => { setEditId(s.id); setEditText(s.text); }}
+                              aria-label="Correct this transcript line"
                               className="seg-actions focus-ring shrink-0 text-[10.5px] text-ink-400 hover:text-accent transition-colors"
                               title="Correct this line">✎</button>
                       <button onClick={() => addHighlight(s.start_ms)}
+                              aria-label="Highlight from this moment"
                               className="seg-actions focus-ring shrink-0 text-[10.5px] text-ink-400 hover:text-amber-600 transition-colors"
                               title="Highlight from here">★</button>
                       </>

@@ -167,6 +167,19 @@ export const HIGHLIGHTS = {
     { at_beat: "b-iv-2", offset_ms: 26000, span_ms: 40000, label: "The metadata answer", note: "Sofia's debrief line: you cannot fake that.", source: "playback" },
     { at_beat: "b-iv-3", offset_ms: 14000, span_ms: 46000, label: "Incident story — authority and rehearsal", note: "Staff-level reasoning about systems of people.", source: "playback" },
   ],
+  "m-standup": [
+    { at_beat: "b-su-2", offset_ms: 6000, span_ms: 26000, label: "Thursday unblocks the empty state", note: "The only dependency in the room, resolved in four lines.", source: "playback" },
+  ],
+  "m-investor": [
+    { at_beat: "b-inv-3", offset_ms: 14000, span_ms: 40000, label: "\u201cThe transcript is not the product\u201d", note: "Priya's positioning answer to Nina's crowded-market question.", source: "playback" },
+  ],
+  "m-design-review": [
+    { at_beat: "b-dr-3", offset_ms: 4000, span_ms: 34000, label: "Aisha's customer argument wins", note: "Two metrics, one kill criterion each, written down in the room.", source: "transcript-select" },
+  ],
+  "m-allhands": [
+    { at_beat: "b-ah-4", offset_ms: 8000, span_ms: 30000, label: "On-call goes from one person to two on Monday", note: "The concrete answer behind the process changes.", source: "playback" },
+    { at_beat: "b-ah-4", offset_ms: 62000, span_ms: 24000, label: "Adequate coffee", note: "Tom's line got the biggest reaction in the chat.", source: "playback" },
+  ],
   "m-solo-test": [
     { at_beat: "b-solo-2", offset_ms: 1500, span_ms: 26000, label: "The two action items I said out loud", note: "Testing whether extraction picks them up. It did.", source: "live" },
   ],
