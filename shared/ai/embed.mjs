@@ -35,11 +35,17 @@ export function fromBytes(buf) {
   return new Int8Array(u8.buffer, u8.byteOffset, u8.length);
 }
 
-/** Semantic ranking only counts once the corpus is (essentially) fully embedded;
- *  partial coverage would make results inconsistent between meetings, which is
- *  worse than being honestly lexical. */
+/** Semantic ranking switches on once enough key moments are embedded to matter.
+ *
+ * Coverage is reported, not hidden - but nine vectors is not a semantic layer, it
+ * is a token gesture that would let the UI claim "semantic" while changing almost
+ * nothing. The embedding build is resumable and quota-gated (1000 requests/day);
+ * when it passes MIN_SEMANTIC_VECTORS the mode flips on by itself and the badge
+ * says exactly what is embedded.
+ */
+export const MIN_SEMANTIC_VECTORS = 150;
 export function semanticReady(vectorCount, segmentCount) {
-  return segmentCount > 0 && vectorCount / segmentCount >= 0.99;
+  return segmentCount > 0 && vectorCount >= MIN_SEMANTIC_VECTORS;
 }
 
 /** Dot product over int8 == cosine up to the quantisation error, since both sides

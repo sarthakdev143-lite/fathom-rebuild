@@ -240,7 +240,7 @@ test("action items get owners, spoken due dates and a timestamp", () => {
 });
 
 // ---- embedding math -------------------------------------------------------
-import { quantizeInt8, fromHex, toHex, similarity, rrfMerge, semanticReady } from "../shared/ai/embed.mjs";
+import { quantizeInt8, fromHex, toHex, similarity, rrfMerge, semanticReady, MIN_SEMANTIC_VECTORS } from "../shared/ai/embed.mjs";
 
 test("int8 quantisation preserves cosine ordering", () => {
   const a = [1, 2, 3, 4, 5, 6, 7, 8].map((x) => x / 10);
@@ -264,9 +264,12 @@ test("rrf fusion ranks an item both lists agree on above either list's sole favo
   assert.equal(fused[0].key, "shared", "agreement between rankers should win");
 });
 
-test("semantic ranking stays off until the corpus is essentially fully embedded", () => {
-  assert.equal(semanticReady(0, 2178), false);
-  assert.equal(semanticReady(900, 2178), false, "partial coverage must not switch modes");
-  assert.equal(semanticReady(2178, 2178), true);
-  assert.equal(semanticReady(2170, 2178), true, "a handful of missing rows is tolerable");
+test("semantic ranking is available from the first vector, and coverage is reported not gated", () => {
+  // The design embeds key moments within a 1000-requests/day free quota; partial is
+  // the expected state and the UI states the scope. Gating on full coverage would
+  // have switched the feature off forever.
+  assert.equal(semanticReady(0, 2161), false, "no vectors, no semantic claims");
+  assert.equal(semanticReady(9, 2161), false, "nine vectors is a token gesture, not a semantic layer");
+  assert.equal(semanticReady(200, 2161), true, "partial coverage of key moments is the designed state");
+  assert.equal(semanticReady(2161, 2161), true);
 });

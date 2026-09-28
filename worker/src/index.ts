@@ -484,6 +484,8 @@ app.get("/api/search", async (c) => {
     query: q,
     mode: sem.hits.length ? "hybrid" : "lexical",
     semantic_ready: sem.ready,
+    semantic_scope: sem.ready ? "key moments + short meetings" : null,
+    semantic_vectors: (await vectors(c.env)).count,
     total: merged.length,
     hits: merged.slice(0, 100),
     meetings: [...byMeeting.entries()].map(([meeting_id, count]) => ({ meeting_id, count })).sort((a, b) => b.count - a.count),
@@ -525,7 +527,7 @@ app.patch("/api/calendar/events/:id", async (c) => {
 // milliseconds. When the corpus is not (yet) embedded - the free embedding quota
 // is a batch a minute, and it is a resumable build step - semanticReady() keeps
 // the app honestly lexical instead of half-semantic.
-let vecCache: { rows: { key: string; meeting_id: string; ord: number; vec: Int8Array }[]; at: number; coverage: number } | null = null;
+let vecCache: { rows: { key: string; meeting_id: string; ord: number; vec: Int8Array }[]; at: number; count: number; coverage: number } | null = null;
 
 async function vectors(env: Env) {
   if (vecCache && Date.now() - vecCache.at < 300000) return vecCache;
@@ -539,7 +541,7 @@ async function vectors(env: Env) {
     ord: r.ord,
     vec: fromBytes(r.vec),
   }));
-  vecCache = { rows, at: Date.now(), coverage: rows.length / Math.max(1, (tot as any)?.c || 1) };
+  vecCache = { rows, at: Date.now(), coverage: rows.length / Math.max(1, (tot as any)?.c || 1), count: rows.length };
   return vecCache;
 }
 
@@ -670,6 +672,8 @@ app.post("/api/ask", async (c) => {
     lexical_candidates: lexPassages.length,
     semantic_candidates: sem.hits.length,
     semantic_ready: sem.ready,
+    semantic_vectors: (await vectors(c.env)).count,
+    semantic_scope: "key moments + short meetings (free-tier embedding quota)",
     ask_use_model: settings.ask_use_model,
   });
 });

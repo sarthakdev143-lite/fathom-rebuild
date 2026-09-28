@@ -398,11 +398,15 @@ function SearchPage() {
             <strong className="text-ink-800 tabular-nums">{res.total}</strong> hits across{" "}
             <strong className="text-ink-800 tabular-nums">{res.meetings.length}</strong> meetings
             <span className={`ml-2 px-1.5 py-0.5 rounded border text-[10px] uppercase tracking-wider font-semibold ${res.mode === "hybrid" ? "border-accent/40 bg-accent-soft text-accent" : "border-ink-200 bg-white text-ink-500"}`}>
-              {res.mode === "hybrid" ? "semantic + lexical" : "lexical"}
+              {res.mode === "hybrid" ? `semantic + lexical` : "lexical"}
             </span>
-            {res.mode !== "hybrid" && (
-              <span className="text-ink-400" title="Embedding the corpus is a resumable build step gated by Gemini's free embedding quota">
-                {" "}· corpus not embedded yet, so this is keyword ranking
+            {res.mode === "hybrid" ? (
+              <span className="text-ink-400" title="Gemini's free embedding quota is 1000 requests a day; the full corpus is ~2,161 lines, so the embedded set is the authored key moments plus the short meetings. Everything else is covered by lexical ranking and fused by RRF.">
+                {" "}· semantic over {res.semantic_vectors} key moments, lexical over all 2,161 lines
+              </span>
+            ) : (
+              <span className="text-ink-400" title="Embedding is a resumable build step gated by Gemini's free embedding quota (1000 requests/day). It resumes where it stopped and switches this on by itself.">
+                {" "}· keyword ranking — embedding build paused at {res.semantic_vectors ?? 0} of 425 key moments by the free quota window
               </span>
             )}
           </p>
