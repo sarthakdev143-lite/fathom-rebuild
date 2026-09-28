@@ -238,6 +238,18 @@
   }
 
   function report() {
+    // Mirror state onto the document element. Debugging aid first - it lets a human
+    // see at a glance whether capture is live - and it gives the end-to-end test a
+    // way to read content-script state, which page.evaluate cannot otherwise reach
+    // (the content script lives in an isolated world; chrome.runtime is undefined
+    // in the page context).
+    try {
+      const el = document.documentElement;
+      el.dataset.sncLines = String(session.lines.length);
+      el.dataset.sncFound = session.containerFound ? "1" : "0";
+      el.dataset.sncCustom = session.usingCustomSelector ? "1" : "0";
+      el.dataset.sncInterim = session.interim ? session.interim.text : "";
+    } catch { /* never let telemetry break capture */ }
     port.send({
       type: "session-update",
       platform: platform.id,

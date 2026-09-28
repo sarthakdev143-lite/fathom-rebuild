@@ -180,7 +180,8 @@ npx wrangler d1 execute fathom-db --remote --file=db/seed.sql
 ## Tests and integrity checks
 
 ```bash
-npm test                     # 14 capture-harness tests + 20 AI-layer tests
+npm test                     # capture harness + AI layer + the extension, end to end
+npm run test:extension       # loads the extension in Chromium and captures a mock call
 npm run test:ai              # just the AI layer (node:test, no framework dependency)
 npm run smoke                # 62 checks against the deployed URL, as a logged-out stranger
 npm run capture:validate     # .agent-logs/ conforms to the 8x format
@@ -200,6 +201,15 @@ that a failing model provider degrades to cited retrieval instead of throwing.
 
 CI (`.github/workflows/agent-log-ci.yml`) re-runs all three on every push, so the log's integrity is
 machine-checked on the remote rather than taken on trust.
+
+## The extension, and how it is tested
+
+`extension/` captures live captions from Meet, Zoom web and Teams web - no bot, no
+audio, no API key - and delivers sessions to this app as real meetings.
+`npm run test:extension` proves the pipeline in Chromium against a mock captions
+page (12 checks). `docs/EXTENSION-TEST.md` is the five-minute real-call script,
+because selector lists are the one part of this project that rots on a vendor's
+schedule and only a live call can check them.
 
 ## What is not here
 

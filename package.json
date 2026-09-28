@@ -16,12 +16,13 @@
     "capture:validate": "python3 tools/capture/capture.py validate --strict",
     "capture:test": "python3 tools/capture/test_capture.py",
     "hooks:install": "bash tools/capture/install-hooks.sh",
-    "test": "python3 tools/capture/test_capture.py && node --test tests/",
+    "test": "python3 tools/capture/test_capture.py && node --test tests/ && node scripts/extension-check.mjs",
     "test:ai": "node --test tests/",
     "smoke": "python3 scripts/smoke-test.py",
     "browser": "node scripts/browser-check.mjs",
     "browser:shots": "node scripts/browser-check.mjs --shots",
-    "verify:asr": "node scripts/verify-asr.mjs"
+    "verify:asr": "node scripts/verify-asr.mjs",
+    "test:extension": "node scripts/extension-check.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.11.2",

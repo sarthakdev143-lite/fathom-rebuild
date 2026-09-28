@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- TEST FIXTURE, not product. Mimics the caption DOM shape Google Meet renders:
+     a container whose children are one line per speaker turn, each with a speaker
+     span and a text span. Lines grow (interim) then a new child appears (final).
+     extension/src/content.js should capture this exactly as it captures a call. -->
+<html><head><meta charset="utf-8"><title>Mock call — Q3 planning</title></head>
+<body style="font:14px system-ui;background:#111;color:#eee;padding:24px">
+<h3>Mock call in progress — captions on</h3>
+<div id="caps" class="captions-container" aria-live="polite" role="log" style="min-height:200px;border:1px solid #333;border-radius:8px;padding:12px"></div>
+<script>
+const SCRIPT = [
+  ["Priya Raman", "Okay, let's get started. The Q3 number is four point eight two million."],
+  ["Tom Whitfield", "And churn came in at one point nine, better than the two point two we planned."],
+  ["Marcus Lee", "The Halcyon deal is in late stage legal. I'd rather over-communicate the risk."],
+  ["Priya Raman", "Agreed. Dan, can you own the written security position by the fourteenth?"],
+  ["Dan Okafor", "I'll take it. Fourteenth of October, not earlier."],
+  ["Sofia Marchetti", "The post-mortem write-up goes to the whole company by Friday."],
+  ["Aisha Bello", "Two customers asked for credits after the outage. I've not agreed anything."],
+  ["Tom Whitfield", "Bring those to me before you agree them, please."],
+  ["Priya Raman", "Right. Actions are in the notetaker. Thanks all."],
+];
+const box = document.getElementById("caps");
+let i = 0, stage = 0;
+function line(speaker, text) {
+  const d = document.createElement("div");
+  d.className = "caption-line";
+  d.innerHTML = `<span class="speaker-name">${speaker}</span><span class="caption-text">: ${text}</span>`;
+  box.appendChild(d);
+  return d;
+}
+let cur = null, full = "";
+setInterval(() => {
+  if (i >= SCRIPT.length) return;
+  const [sp, tx] = SCRIPT[i];
+  if (stage === 0) { full = tx; cur = line(sp, ""); stage = 1; }
+  const words = full.split(" ");
+  const take = Math.min(words.length, Math.ceil(words.length * (stage / 4)) + stage);
+  cur.querySelector(".caption-text").textContent = ": " + words.slice(0, take).join(" ");
+  stage++;
+  if (take >= words.length) { i++; stage = 0; }
+}, 500);
+</script>
+</body></html>
