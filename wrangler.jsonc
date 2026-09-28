@@ -1,0 +1,42 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fathom-rebuild",
+  "main": "worker/src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  "assets": {
+    "directory": "./web/dist",
+    "binding": "ASSETS",
+    // Every request goes through the Worker, including static assets. Needed
+    // because Cloudflare's asset server ignores Range requests (returns 200 with
+    // the whole file instead of 206), and an <audio> element that cannot issue
+    // range requests cannot seek - clicking a transcript line at minute 50 of the
+    // flagship meeting would stall while the browser buffered from the start.
+    // wrangler 3.114 only supports the boolean form, so the Worker proxies assets.
+    "run_worker_first": true,
+    // "none", not "single-page-application": with SPA handling here, a MISSING
+    // asset comes back as index.html with status 200, which made /media/nope.mp3
+    // serve HTML as audio and /api/nonexistent return 200. The Worker catch-all
+    // below already does the SPA fallback, so let the asset server report 404.
+    "not_found_handling": "none",
+    "html_handling": "auto-trailing-slash"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "fathom-db",
+      "database_id": "7b732055-83bb-4200-9dfb-3ffacb12d42b"
+    }
+  ],
+
+  // No `limits.cpu_ms`: CPU limits are a paid-plan feature and the API rejects
+  // them with code 100328 on a free account. Removed rather than left to fail.
+
+  "vars": {
+    "AI_PROVIDER": "auto",
+    "DEMO_MODE": "true"
+  }
+}

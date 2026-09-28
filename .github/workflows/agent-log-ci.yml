@@ -1,0 +1,71 @@
+name: agent-log-integrity
+
+# Public, machine-checked proof that .agent-logs/ ships with the repo, matches
+# the 8x capture format, and has no dangling (prompt-without-response) turns.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: .agent-logs/ is committed
+        run: |
+          test -d .agent-logs || { echo "::error::.agent-logs/ missing"; exit 1; }
+          n=$(ls .agent-logs/*_*.md 2>/dev/null | wc -l)
+          echo "session logs committed: $n"
+          test "$n" -gt 0
+
+      - name: harness regression tests
+        run: python3 tools/capture/test_capture.py
+
+      - name: format + completeness
+        run: python3 tools/capture/capture.py validate --strict
+
+      - name: no committed secrets
+        run: python3 tools/capture/secret_scan.py --tracked
+
+      - name: capture stats
+        run: |
+          echo "| metric | value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| session logs | $(ls .agent-logs/*_*.md | wc -l) |" >> $GITHUB_STEP_SUMMARY
+          echo "| prompts captured | $(grep -rh 'type=PROMPT' .agent-logs | wc -l) |" >> $GITHUB_STEP_SUMMARY
+          echo "| responses captured | $(grep -rh 'type=RESPONSE' .agent-logs | wc -l) |" >> $GITHUB_STEP_SUMMARY
+          echo "| commits | $(git rev-list --count HEAD) |" >> $GITHUB_STEP_SUMMARY
+
+  app:
+    name: typecheck, tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: types
+        run: npx tsc --noEmit
+      - name: AI layer tests
+        run: npm run test:ai
+      - name: SPA builds
+        run: npx vite build
+      - name: seed data is reproducible
+        run: |
+          cp db/seed.sql /tmp/seed.committed.sql
+          npm run build:db
+          if ! diff -q /tmp/seed.committed.sql db/seed.sql; then
+            echo "::error::db/seed.sql is not reproducible from seed/ - regenerate and commit"
+            exit 1
+          fi
+          echo "seed.sql regenerates byte-identically"

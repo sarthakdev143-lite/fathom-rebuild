@@ -1,0 +1,46 @@
+{
+  "name": "fathom-rebuild",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "8x take-home: a rebuild of fathom.video - the AI meeting notetaker",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:worker\"",
+    "dev:web": "vite",
+    "dev:worker": "wrangler dev",
+    "build": "vite build",
+    "build:db": "node scripts/build-seed-sql.mjs",
+    "db:local": "wrangler d1 execute fathom-db --local --file=db/schema.sql && wrangler d1 execute fathom-db --local --file=db/seed.sql",
+    "db:remote": "wrangler d1 execute fathom-db --remote --file=db/schema.sql && wrangler d1 execute fathom-db --remote --file=db/seed.sql",
+    "deploy": "npm run build && wrangler deploy",
+    "capture:validate": "python3 tools/capture/capture.py validate --strict",
+    "capture:test": "python3 tools/capture/test_capture.py",
+    "hooks:install": "bash tools/capture/install-hooks.sh",
+    "test": "python3 tools/capture/test_capture.py && node --test tests/",
+    "test:ai": "node --test tests/",
+    "smoke": "python3 scripts/smoke-test.py",
+    "browser": "node scripts/browser-check.mjs",
+    "browser:shots": "node scripts/browser-check.mjs --shots",
+    "verify:asr": "node scripts/verify-asr.mjs"
+  },
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.11.2",
+    "hono": "^4.6.14",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "playwright": "^1.49.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "wrangler": "^3.99.0"
+  }
+}

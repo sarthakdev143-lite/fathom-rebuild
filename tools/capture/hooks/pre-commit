@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# pre-commit gate for the 8x agent-capture requirement.
+#
+# This is the "fires on its own" mechanism. It is impossible to commit code in
+# this repo while:
+#   (a) a turn is open  - a prompt was captured but its response was not,
+#   (b) .agent-logs/ fails format validation,
+#   (c) a staged file looks like it contains a live credential.
+#
+# Installed by tools/capture/install-hooks.sh (run automatically by
+# scripts/bootstrap.sh at the start of every working session).
+
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CAPTURE="$REPO_ROOT/tools/capture/capture.py"
+
+fail() {
+  echo "" >&2
+  echo "commit blocked: $1" >&2
+  echo "" >&2
+  exit 1
+}
+
+[ -f "$CAPTURE" ] || fail "tools/capture/capture.py is missing"
+
+# (a)+(b) the log must be complete and well formed for what is already captured
+python3 "$CAPTURE" validate --strict --quiet >&2 ||
+  fail ".agent-logs/ did not validate (run: python3 tools/capture/capture.py validate)"
+
+# .agent-logs/ must actually be tracked
+if [ ! -d "$REPO_ROOT/.agent-logs" ]; then
+  fail ".agent-logs/ does not exist - the capture log must ship with the repo"
+fi
+if git check-ignore -q .agent-logs 2>/dev/null; then
+  fail ".agent-logs/ is gitignored - the brief forbids this"
+fi
+
+# (c) never let a credential reach a public repo
+python3 "$REPO_ROOT/tools/capture/secret_scan.py" --staged >&2 ||
+  fail "credential-shaped string in staged files (see secret-scan output above)"
+
+exit 0

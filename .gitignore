@@ -1,0 +1,39 @@
+# NOTE: .agent-logs/ is deliberately NOT ignored. It ships with this repo as
+# part of the 8x submission, and both the pre-commit gate and CI fail if it is
+# ever excluded here.
+
+# dependencies / builds
+__pycache__/
+*.pyc
+node_modules/
+dist/
+build/
+.next/
+.vite/
+.wrangler/
+coverage/
+
+# local env + secrets (real credentials live OUTSIDE the repo, in
+# /home/user/.secrets/env.sh, and are never written into the tree)
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+*.pem
+secrets.json
+
+# Piper voice models: ~63 MB each, ~800 MB total. Downloaded on demand by
+# scripts/synthesize-audio.py, never committed.
+media/voices/
+media/local/
+*.wav
+
+# The synthesized MP3s under web/public/media/ ARE committed on purpose: they are
+# the meeting audio the deployed app plays, they total ~54 MB, and committing them
+# means a fresh clone can deploy without ~40 minutes of TTS compute.
+
+# os / editor
+.DS_Store
+*.swp
+.idea/

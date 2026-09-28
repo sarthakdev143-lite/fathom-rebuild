@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; width: 340px; font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:#0d1017; color:#e5e9f2; }
+  header { display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.08); }
+  .logo { width:26px; height:26px; border-radius:7px; background:#6366f1; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; font-size:13px; }
+  h1 { font-size:13px; margin:0; font-weight:650; }
+  .sub { font-size:10.5px; color:#8b93a7; }
+  main { padding:12px 14px; }
+  .state { border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:10px 12px; background:rgba(255,255,255,.03); }
+  .row { display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 0; }
+  .k { color:#8b93a7; }
+  .v { color:#e5e9f2; font-variant-numeric: tabular-nums; }
+  .ok { color:#34d399; } .warn { color:#fbbf24; } .bad { color:#f87171; }
+  .interim { margin-top:8px; font-size:12px; color:#a5b4fc; font-style:italic; min-height:18px; }
+  button { width:100%; margin-top:8px; padding:8px 10px; border-radius:9px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); color:#e5e9f2; font:600 12.5px system-ui; cursor:pointer; }
+  button:hover { background:rgba(255,255,255,.1); }
+  button.primary { background:#6366f1; border-color:#6366f1; color:#fff; }
+  button.primary:hover { background:#4f52e0; }
+  h2 { font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:#8b93a7; margin:14px 0 6px; }
+  .item { border:1px solid rgba(255,255,255,.08); border-radius:9px; padding:8px 10px; margin-bottom:6px; font-size:11.5px; }
+  .item .t { color:#c7cddb; }
+  .item .m { color:#8b93a7; font-size:10.5px; margin-top:2px; }
+  input { width:100%; margin-top:6px; padding:7px 9px; border-radius:8px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); color:#e5e9f2; font:12px ui-monospace, monospace; }
+  .empty { color:#8b93a7; font-size:11.5px; padding:6px 0; }
+  a { color:#a5b4fc; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">S</div>
+  <div>
+    <h1>Signal Notes Capture</h1>
+    <div class="sub">reads the captions the platform already renders</div>
+  </div>
+</header>
+<main>
+  <div class="state">
+    <div class="row"><span class="k">platform</span><span class="v" id="platform">—</span></div>
+    <div class="row"><span class="k">captions element</span><span class="v" id="container">—</span></div>
+    <div class="row"><span class="k">capturing</span><span class="v" id="capturing">—</span></div>
+    <div class="row"><span class="k">lines / elapsed</span><span class="v" id="counts">—</span></div>
+    <div class="interim" id="interim"></div>
+  </div>
+  <button id="pick">Pick the captions element</button>
+  <button id="toggle">Stop capture</button>
+  <button id="send" class="primary">Save &amp; send to my library now</button>
+
+  <h2>Sessions</h2>
+  <div id="queue"></div>
+
+  <h2>Send to</h2>
+  <input id="target" spellcheck="false" />
+  <button id="save-target">Save target</button>
+  <button id="export">Export everything as JSON</button>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

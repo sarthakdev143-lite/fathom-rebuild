@@ -1,0 +1,65 @@
+{
+  "active": "a96fd38f-9e5e-4173-b933-ad858a7ea67a",
+  "sessions": {
+    "1622cc4e-afea-4e23-9b65-e685f81ee1d4": {
+      "author": "sarthakdev143-lite",
+      "closed": true,
+      "date": "2026-09-27",
+      "file": "2026-09-27_13-54-59_1622cc4e-afea-4e23-9b65-e685f81ee1d4.md",
+      "first_prompt_time": "2026-09-27T13:54:59.854Z",
+      "last_activity": "2026-09-27T13:54:59.854Z",
+      "last_prompt_time": "2026-09-27T13:54:59.854Z",
+      "model": "qwen",
+      "project": "fathom-rebuild",
+      "session_id": "1622cc4e-afea-4e23-9b65-e685f81ee1d4",
+      "started_at": "2026-09-27T13:54:59.807Z",
+      "tool": "qwen-agent-harness",
+      "total_exchanges": 1
+    },
+    "62941e94-87e1-464a-8ae0-e6709e3d4a8d": {
+      "author": "sarthakdev143-lite",
+      "closed": true,
+      "date": "2026-09-27",
+      "file": "2026-09-27_13-55-11_62941e94-87e1-464a-8ae0-e6709e3d4a8d.md",
+      "first_prompt_time": "2026-09-27T13:55:11.223Z",
+      "last_activity": "2026-09-27T13:55:11.223Z",
+      "last_prompt_time": "2026-09-27T13:55:11.223Z",
+      "model": "qwen",
+      "project": "fathom-rebuild",
+      "session_id": "62941e94-87e1-464a-8ae0-e6709e3d4a8d",
+      "started_at": "2026-09-27T13:55:11.167Z",
+      "tool": "qwen-agent-harness",
+      "total_exchanges": 1
+    },
+    "6977f88f-2221-4a3c-845d-82eb8ba95aa5": {
+      "author": "sarthakdev143-lite",
+      "closed": true,
+      "date": "2026-09-27",
+      "file": "2026-09-27_13-55-34_6977f88f-2221-4a3c-845d-82eb8ba95aa5.md",
+      "first_prompt_time": "2026-09-27T13:55:34.953Z",
+      "last_activity": "2026-09-27T13:55:34.953Z",
+      "last_prompt_time": "2026-09-27T13:55:34.953Z",
+      "model": "qwen",
+      "project": "fathom-rebuild",
+      "session_id": "6977f88f-2221-4a3c-845d-82eb8ba95aa5",
+      "started_at": "2026-09-27T13:55:34.883Z",
+      "tool": "qwen-agent-harness",
+      "total_exchanges": 1
+    },
+    "a96fd38f-9e5e-4173-b933-ad858a7ea67a": {
+      "author": "sarthakdev143-lite",
+      "closed": false,
+      "date": "2026-09-27",
+      "file": "2026-09-27_13-58-08_a96fd38f-9e5e-4173-b933-ad858a7ea67a.md",
+      "first_prompt_time": "2026-09-27T13:46:00.000Z",
+      "last_activity": "2026-09-27T13:46:00.000Z",
+      "last_prompt_time": "2026-09-28T05:00:17.493Z",
+      "model": "qwen",
+      "project": "fathom-rebuild",
+      "session_id": "a96fd38f-9e5e-4173-b933-ad858a7ea67a",
+      "started_at": "2026-09-27T13:58:08.951Z",
+      "tool": "qwen-agent-harness",
+      "total_exchanges": 13
+    }
+  }
+}

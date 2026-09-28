@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Signal Notes Capture — bot-less meeting transcription",
+  "version": "1.0.0",
+  "description": "Reads the live captions Zoom, Meet and Teams already render in the page and turns them into a meeting: transcript, speakers, timestamps. No bot joins, no audio is recorded, no API key is needed - the platform already did the speech-to-text and diarisation. Sends the session to your Signal Notes library.",
+  "permissions": ["storage", "scripting", "tabs"],
+  "host_permissions": ["https://meet.google.com/*", "https://*.zoom.us/*", "https://*.zoom.com/*", "https://teams.microsoft.com/*", "https://teams.live.com/*", "https://fathom-rebuild.sarthak-fathom.workers.dev/*"],
+  "background": { "service_worker": "src/background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*", "https://*.zoom.us/*", "https://*.zoom.com/*", "https://teams.microsoft.com/*", "https://teams.live.com/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": { "default_popup": "src/popup.html", "default_title": "Signal Notes Capture" },
+  "icons": {
+    "128": "icons/icon128.png",
+    "48": "icons/icon48.png",
+    "16": "icons/icon16.png"
+  }
+}
