@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { api, fmtClock, fmtDate, fmtDuration, initials, renderMarkdown, type MeetingDetail, type Segment } from "../api";
+import { api, fmtClock, fmtDate, fmtDuration, initials, renderMarkdown, requestLog, type MeetingDetail, type Segment } from "../api";
 
 /** True below the lg breakpoint. Drives the single-pane mobile layout. */
 function useIsNarrow() {
@@ -101,6 +101,8 @@ export default function MeetingPage() {
   const [askThread, setAskThread] = useState<{ q: string; res: any }[]>([]);
   const [askBusy, setAskBusy] = useState(false);
   const [suggested, setSuggested] = useState<string[]>([]);
+  const [showPerf, setShowPerf] = useState(false);
+  const [showKeys, setShowKeys] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [showTs, setShowTs] = useState(true);
@@ -310,6 +312,14 @@ export default function MeetingPage() {
           break;
         }
         case "h": case "H": e.preventDefault(); addHighlight(currentMs); break;
+        case "?": e.preventDefault(); setShowKeys((v) => !v); break;
+        case "Escape":
+          // Overlays must dismiss from the keyboard; a modal that only closes on
+          // a backdrop click is a trap for anyone not using a mouse. The browser
+          // check fell over this, which is the browser check doing its job.
+          setShowKeys(false); setShareUrl(null); setEditId(null);
+          break;
+        case "p": case "P": e.preventDefault(); setShowPerf((v) => !v); break;
         default: break;
       }
     };
@@ -467,7 +477,7 @@ export default function MeetingPage() {
             {rate}×
           </button>
           <span className="shrink-0 hidden lg:inline text-[10.5px] text-ink-400 tabular-nums" title="Keyboard shortcuts">
-            space ⏯ · ←→ 10s · shift+←→ 30s · j/k line · h highlight
+            space ⏯ · ←→ 10s · j/k line · h highlight · <button onClick={() => setShowKeys(true)} className="focus-ring underline decoration-ink-300 hover:decoration-accent">?</button> · <button onClick={() => setShowPerf((v) => !v)} className="focus-ring underline decoration-ink-300 hover:decoration-accent">perf</button>
           </span>
           {playing && engine === "sim" && (
             <span className="shrink-0 flex items-end gap-[2px] h-3.5" aria-hidden>
@@ -867,6 +877,47 @@ export default function MeetingPage() {
           </div>
         </aside>
       </div>
+
+
+      {showPerf && data && (
+        <div className="shrink-0 border-b border-ink-200 bg-ink-950 text-ink-200 px-6 py-2.5 font-mono text-[11px] leading-relaxed fade-up">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[10px] uppercase tracking-[0.08em] text-ink-400 font-sans font-semibold">performance — the one-hour case</span>
+            <button onClick={() => setShowPerf(false)} className="focus-ring ml-auto text-ink-400 hover:text-white font-sans text-[11px]">hide (p)</button>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1">
+            <span>segments in meeting <b className="text-white tabular-nums">{segments.length.toLocaleString()}</b></span>
+            <span>rows in DOM <b className="text-white tabular-nums">{virtualizer.getVirtualItems().length}</b> (virtualised)</span>
+            <span>playback engine <b className="text-white">{engine}</b></span>
+            <span>audio <b className="text-white tabular-nums">{(durationMs / 60000).toFixed(1)}min</b> / {(data.meeting.audio_duration_ms / 60000).toFixed(1)}min file</span>
+            {requestLog().slice(-6).map((r, i) => (
+              <span key={i}>
+                {r.path.replace("/api/", "")} <b className="text-white tabular-nums">{r.ms}ms</b>
+                {r.serverMs != null && <span className="text-ink-400"> (edge {r.serverMs}ms)</span>}
+              </span>
+            ))}
+            <span>summary by <b className="text-white">{data.summary?.generated_by}</b>{typeof data.summary?.latency_ms === "number" && <span className="text-ink-400"> {data.summary.latency_ms}ms</span>}</span>
+          </div>
+          <div className="text-ink-400 mt-1 font-sans text-[10.5px]">
+            edge times come from the Worker's Server-Timing header; client times include TLS and transfer of a 14 MB-range-capable asset manifest.
+          </div>
+        </div>
+      )}
+
+      {showKeys && (
+        <div className="fixed inset-0 z-50 bg-ink-950/50 flex items-center justify-center p-6" onClick={() => setShowKeys(false)}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl fade-up" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[15px] font-semibold text-ink-900 mb-3">Keyboard</h3>
+            {[["space", "play / pause"], ["← / →", "seek 10s"], ["shift + ← / →", "seek 30s"], ["j / k", "next / previous line"], ["h", "highlight this moment"], ["p", "performance panel"], ["?", "this overlay"]].map(([k, v]) => (
+              <div key={k} className="flex items-center gap-3 py-1">
+                <kbd className="px-1.5 py-0.5 rounded border border-ink-200 bg-ink-50 text-[11px] font-mono text-ink-700 min-w-[86px] text-center">{k}</kbd>
+                <span className="text-[12.5px] text-ink-600">{v}</span>
+              </div>
+            ))}
+            <p className="text-[11px] text-ink-400 mt-3 leading-relaxed">Ignored while typing in a field. The transcript is the surface people live in, so it should not need a mouse.</p>
+          </div>
+        </div>
+      )}
 
       {shareUrl && (
         <div className="fixed inset-0 z-50 bg-ink-950/45 flex items-center justify-center p-6" onClick={() => setShareUrl(null)}>

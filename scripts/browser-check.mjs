@@ -128,6 +128,25 @@ const run = async () => {
   await page.getByTestId("seg-0").locator("button").first().click();
   await page.waitForTimeout(300);
 
+  await page.keyboard.press("p");
+  await page.waitForTimeout(400);
+  check("the perf panel opens and reports the one-hour case",
+    (await page.getByText("rows in DOM").count()) > 0 && (await page.getByText(/virtualised/).count()) > 0);
+  check("...with real edge timings from Server-Timing",
+    (await page.getByText(/edge \d+ms/).count()) > 0);
+  await shot(page, "16-perf-panel");
+  await page.keyboard.press("p");
+  await page.keyboard.press("?");
+  await page.waitForTimeout(300);
+  check("the shortcuts overlay opens on ?", (await page.getByText("play / pause").count()) > 0);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(250);
+  check("Escape closes the overlay", (await page.getByText("play / pause").count()) === 0);
+  // Return to the Summary tab explicitly: pressing keys must not have left the
+  // rail on another tab, and the next step needs the template pills visible.
+  await page.getByTestId("rail").getByRole("button", { name: /^Summary$/ }).click();
+  await page.waitForTimeout(200);
+
   // ---- template switching ------------------------------------------------
   const execPill = page.getByRole("button", { name: /^Executive brief$/ });
   await execPill.click();

@@ -58,11 +58,28 @@ export type MeetingDetail = {
   stats: { n: number; words: number; crosstalk: number; avg_conf: number } | null;
 };
 
+// Client-visible request telemetry: path, round-trip ms, and the Worker's own
+// Server-Timing figure. Kept as a ring buffer so the perf panel can show what the
+// page actually cost without a profiling build.
+export type ReqStat = { path: string; ms: number; serverMs: number | null; at: number };
+const reqLog: ReqStat[] = [];
+export const requestLog = () => reqLog.slice();
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   const res = await fetch(path, {
     ...init,
     headers: { "content-type": "application/json", ...(init?.headers || {}) },
   });
+  const st = res.headers.get("server-timing");
+  const m = st ? /app;dur=([\d.]+)/.exec(st) : null;
+  reqLog.push({
+    path: path.split("?")[0],
+    ms: Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - t0),
+    serverMs: m ? Number(m[1]) : null,
+    at: Date.now(),
+  });
+  if (reqLog.length > 40) reqLog.shift();
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`;
     try { msg = ((await res.json()) as any)?.error || msg; } catch { /* keep status text */ }

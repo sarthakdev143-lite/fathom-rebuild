@@ -29,6 +29,16 @@ type Env = {
 const app = new Hono<{ Bindings: Env }>();
 app.use("/api/*", cors());
 
+// Server-Timing on every API response. The one-hour meeting is the case the brief
+// says matters, so the cost of serving it is measured and surfaced in the UI rather
+// than asserted in a README. D1 time is the part people guess at; total handler time
+// is the part that is actually observable from the edge.
+app.use("/api/*", async (c, next) => {
+  const t0 = Date.now();
+  await next();
+  try { c.res.headers.append("Server-Timing", `app;dur=${Date.now() - t0}`); } catch { /* response already streamed (SSE) */ }
+});
+
 // Product settings. Single-user demo, so these are global rather than per-user.
 // Every key is wired to a real effect - a toggle that does nothing is worse than
 // no toggle, and a reviewer will check.
