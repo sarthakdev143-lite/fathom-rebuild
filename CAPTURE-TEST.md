@@ -388,3 +388,35 @@ synthesis) is now run one meeting per process with `--only-stale` resumability, 
 an interrupted call costs a single meeting instead of a whole turn - and turns end
 with their response captured before any further work, which is why this section
 exists only for the two turns that predate that discipline.
+
+## 13. The commit history before this point does not exist, and why that is honest
+
+Between turns 12 and 13 the hosting environment restored this workspace **without its `.git`
+directory**. Not the excluded `.git/config` - the whole directory. The forty-three commits made
+across turns 1-12, and their interleaving with `.agent-logs/`, were unrecoverable: no pack files,
+no refs, no `ORIG_HEAD` anywhere on the filesystem. Nothing had been pushed, because the PAT lacked
+the Workflows scope until turn 13.
+
+What survived: every file in the working tree, this log in full (it is plain files, not git
+objects), the deployed Worker, its D1 database, the synthesized audio, the extension and every test.
+What did not: the commit objects, and with them the commit-level evidence of work order.
+
+The recovery is **one commit, timestamped at recovery time, containing the whole tree**, labelled
+`RECOVERY:` in its subject. It does not backdate anything and does not reconstruct the lost
+sequence. Rebuilding forty-three commits with fabricated timestamps would manufacture precisely
+the artefact this assignment verifies, and would look identical to the real thing to anyone who
+did not ask.
+
+Consequences a reader should hold:
+
+- The commit graph shows one commit before the recovery work, not twelve turns of interleaving.
+  The turn-by-turn order of the work is in this log and nowhere else; read `.agent-logs/` for it.
+- Commit messages from the lost history survive *as text* inside later messages and in this file's
+  neighbours, but their SHAs and timestamps are gone.
+- The CI workflow on the remote validates this log on every push, so the record that survived is
+  the record that is machine-checked.
+
+Prevention, now in force: every commit is pushed immediately; a `git bundle` of all refs is written
+outside the repository after each turn; and `bootstrap.sh` derives its paths from its own location,
+because a hardcoded workspace root silently skipped the identity restore during this recovery and
+failed the first commit attempt with "Author identity unknown".

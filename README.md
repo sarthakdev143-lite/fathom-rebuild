@@ -7,7 +7,10 @@ take-home assignment.
 **Walkthrough:** `docs/WALKTHROUGH-SCRIPT.md` — timed shot-by-shot script (recorded separately, camera on, under 5 minutes)
 **Product recon:** `docs/RECON.md` — what real Fathom does, feature by feature, with sources and what maps to what here
 **Settings reference:** `docs/SETTINGS.md` — what every toggle does and where to see it
-**Agent capture log:** [`.agent-logs/`](.agent-logs/) — every prompt and final response from the build
+**Agent capture log:** [`.agent-logs/`](.agent-logs/) — every prompt and final response from the build.
+> **History note:** the VM lost its `.git` directory between turns 12 and 13, so the repository begins
+> with a single `RECOVERY:` commit containing the whole tree. The turn-by-turn record of the work is
+> `.agent-logs/`, which survived; see `CAPTURE-TEST.md` §13. Nothing is backdated.
 **Capture verification:** [`CAPTURE-TEST.md`](CAPTURE-TEST.md) — read this first
 **Plan and trade-offs:** [`docs/PLAN.md`](docs/PLAN.md)
 
