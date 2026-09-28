@@ -27,6 +27,15 @@ it, and the walkthrough should be recorded after that, not before.
 | [omi.me — Fathom guide](https://www.omi.me/blogs/ai-note-takers/fathom-guide) | Practical usage patterns: "Use Ask Fathom to pull exact decisions, objections, or dates. Send clips for nuance, not only text recaps. Push summaries and action items into [your tools]." Confirms clips are shared for **nuance**, i.e. the clip is the artefact, not a link to a dashboard. |
 | [aitoolstribe](https://www.aitoolstribe.com/what-is-fathom-ai-note-taker/) | Confirms multiple summary templates exist, and that AI action items and integrations are gated by plan tier. |
 
+## 2026 context (researched 28 Sep, post-acquisition)
+
+Fathom is now **part of Superhuman**, markets "bot or no bot" capture, and leads with four things this
+rebuild does not have: **topic monitoring/alerts** ("automatically monitor key topics so you never miss
+critical moments"), **AI Scorecards** with real-time sales coaching, **tool sync** (Slack, Salesforce,
+HubSpot, Notion, Asana), and **meeting data inside ChatGPT/Claude**. Compliance posture is SOC 2 Type II,
+GDPR, HIPAA, SSO/SCIM. `docs/GAP-MATRIX.md` maps all of it against this build and states the verdict:
+a deep individual-loop subset, which is the correct shape for 24 hours.
+
 ## Product map
 
 Two surfaces, as `PLAN.md` §1 predicted. The second is where the product lives.

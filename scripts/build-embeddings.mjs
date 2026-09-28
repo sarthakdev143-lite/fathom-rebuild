@@ -77,7 +77,10 @@ const rows = selected.filter((r) => !banked.has(`${r.meeting_id}:${r.ord}`));
 console.log(`selected ${selected.length} of ${all.length} segments (key moments + short meetings)`);
 console.log(`embedding ${rows.length} of them (${banked.size} verified banked) with ${EMBED_MODEL} @ ${EMBED_DIM}d`);
 
-const BATCH = 100;
+// The free tier counts each content in a batch as a request against a per-minute
+// cap: batches of 100 429 forever, batches of 25 sail. Discovered by probing n=25,
+// n=10, n=1 after three turns of inferring windows from retry timing.
+const BATCH = Number(process.env.EMBED_BATCH || 25);
 let processed = 0;
 for (let i = 0; i < rows.length; i += BATCH) {
   if (maxSeconds && (Date.now() - startedAt) / 1000 > maxSeconds) {
@@ -113,8 +116,9 @@ for (let i = 0; i < rows.length; i += BATCH) {
         console.log("\n  quota window outlasted the time budget");
         break;
       }
-      process.stdout.write(`\r  quota window - sleeping 62s (attempt ${attempt + 1})   `);
-      await new Promise((r) => setTimeout(r, 62000));
+      const wait = 30000;
+      process.stdout.write(`\r  quota window - sleeping ${wait / 1000}s (attempt ${attempt + 1})   `);
+      await new Promise((r) => setTimeout(r, wait));
     } else {
       console.error(`\nbatch failed: ${res.status} ${(await res.text()).slice(0, 300)}`);
       process.exit(1);
@@ -131,6 +135,7 @@ for (let i = 0; i < rows.length; i += BATCH) {
   processed += chunk.length;
   writeFileSync(PROGRESS, JSON.stringify({ rows: Object.fromEntries(banked) }));
   process.stdout.write(`\r  ${banked.size}/${all.length} embedded, progress saved      `);
+  await new Promise((r) => setTimeout(r, Number(process.env.EMBED_GAP_MS || 2500)));
 }
 console.log("");
 if (banked.size === selected.length) {
