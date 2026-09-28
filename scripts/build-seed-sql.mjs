@@ -297,6 +297,7 @@ for (const d of builtMeetings) {
     speakers: d.speakers.map((s) => ({ name: s.name, color: s.color })),
     segments: d.segments.map((s) => ({
       speaker: s.speaker_name, start_ms: s.start_ms, end_ms: s.end_ms, text: s.text,
+      beat: s.beat ?? null,
     })),
   }));
 }
