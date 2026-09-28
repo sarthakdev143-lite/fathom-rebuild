@@ -758,13 +758,16 @@ app.post("/api/meetings/from-transcript", async (c) => {
   const segments = Array.isArray(b.segments) ? b.segments : [];
   if (!segments.length) return json({ error: "no segments captured" }, { status: 400 });
   const durationMs = Number(b.duration_ms || segments[segments.length - 1]?.end_ms || 0);
+  const platform = ["live-asr", "tab-audio", "upload"].includes(b.platform) ? b.platform : "live-asr";
   const created = await createMeetingFromSegments(c.env, {
     title: String(b.title || "Live transcription").slice(0, 140),
-    platform: "live-asr",
+    platform,
     segments,
     durationMs,
-    source: "live-asr",
-    note: "Transcribed live from a microphone with gemini-3.5-transcribe-live over the Live API, relayed through this Worker so the key never reaches the browser. Audio is not stored.",
+    source: platform === "tab-audio" ? "tab" : platform,
+    note: String(b.note || (platform === "tab-audio"
+      ? "Captured from the meeting tab's mixed audio via gemini-3.5-transcribe-live. Hears every participant; one mixed channel, so no speaker names."
+      : "Transcribed live from a microphone with gemini-3.5-transcribe-live over the Live API, relayed through this Worker so the key never reaches the browser. Hears the microphone only. Audio is not stored.")),
   });
   return json({ ...created, title: b.title }, { status: 201 });
 });

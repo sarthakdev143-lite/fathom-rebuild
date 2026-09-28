@@ -106,7 +106,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 const PLATFORM_COLOR: Record<string, string> = {
-  zoom: "#2d8cff", meet: "#00a968", teams: "#5b5fc7", upload: "#f59e0b", "live-asr": "#ef4444",
+  zoom: "#2d8cff", meet: "#00a968", teams: "#5b5fc7", upload: "#f59e0b", "live-asr": "#ef4444", "tab-audio": "#10b981",
 };
 
 /** Downsampled amplitude sketch of the recording - the card's visual anchor. */
@@ -318,7 +318,7 @@ function MeetingsPage() {
                         )}
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium"
                               style={{ background: `${pc}10`, color: pc }}>{m.platform}</span>
-                        {m.id.startsWith("m-upload") || m.id.startsWith("m-live-asr") ? (
+                        {m.id.startsWith("m-upload") || m.id.startsWith("m-live-asr") || m.id.startsWith("m-tab") ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-[11px] font-medium text-emerald-700">real capture</span>
                         ) : null}
                       </div>

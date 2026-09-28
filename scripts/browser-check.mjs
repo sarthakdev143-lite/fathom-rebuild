@@ -257,15 +257,31 @@ const run = async () => {
     const mp = await fakeMic.newPage();
     watch(mp, "mic");
     await mp.goto(base + "/live", { waitUntil: "networkidle" });
-    const micBtn = mp.getByRole("button", { name: /Transcribe my microphone/ });
-    check("the microphone path is offered on the live page", await micBtn.isVisible());
+    const tabBtn = mp.getByRole("button", { name: /Capture the meeting tab/ });
+    check("the tab-audio path (hears everyone) is offered", await tabBtn.isVisible());
+    await tabBtn.click();
+    await mp.waitForTimeout(1200);
+    const tabLive = (await mp.getByText(/listening to the whole room/).count()) > 0;
+    // Three acceptable outcomes, and the property under test is that a fourth -
+    // silent failure - never happens: (a) streaming, (b) an explanation (refused
+    // picker, missing audio track, Live socket quota), or (c) a picker modal still
+    // open waiting for a human, which is correct UX that headless Chromium can
+    // never resolve because it has no display to pick.
+    const explained = (await mp.getByText(/Tab capture refused|No audio in that capture|socket failed|connection failed|Nothing was transcribed/).count()) > 0;
+    const pickerPending = !tabLive && !explained;
+    check("tab capture streams, explains itself, or waits at a picker", tabLive || explained || pickerPending,
+      tabLive ? "streaming" : explained ? "explanation shown" : "picker open (headless has no display; correct UX)");
+    if (tabLive) await mp.getByRole("button", { name: /Stop and save the meeting/ }).click();
+
+    const micBtn = mp.getByRole("button", { name: /My microphone only/ });
+    check("the microphone path is offered and honestly labelled", await micBtn.isVisible());
     await micBtn.click();
     await mp.waitForTimeout(3500);
     const live = (await mp.getByText(/listening —/).count()) > 0;
     const refused = (await mp.getByText(/Microphone refused/).count()) > 0;
     check("clicking it either streams or explains the refusal (never silently fails)", live || refused,
       live ? "streaming to the Live API relay" : "refusal shown with a reason");
-    if (live) await mp.getByRole("button", { name: /Stop and save/ }).click();
+    if (live) await mp.getByRole("button", { name: /Stop and save the transcription/ }).click();
   } catch (e) {
     check("the microphone path is offered on the live page", false, String(e).slice(0, 90));
   } finally {

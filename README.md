@@ -42,6 +42,22 @@ genuinely real paths.
    Interim hypotheses render as you speak; finalised lines become a saved meeting when you stop. The key
    never reaches the browser, because the Worker holds it.
 
+### Who hears whom
+
+The question that matters in a real meeting, answered per path:
+
+| Path | Hears you | Hears the other participants | Speaker names | Needs |
+|---|---|---|---|---|
+| **Extension captions** | yes | **yes** - the platform captions everyone | **yes**, from the platform | captions on |
+| **Tab audio capture** (`/live`) | yes | **yes** - the platform mixes the whole room into the tab's audio | no - one mixed channel | "Share tab audio" ticked |
+| **Upload a recording** | yes | **yes** - it is the whole recording | whatever ASR detects | a recording |
+| **Microphone** (`/live`) | yes | only through your speakers, badly; with headphones, not at all | no | nothing |
+
+The microphone path is labelled in the UI as hearing you only, because it does. Tab audio is how
+bot-free notetakers actually work: Chrome hands over the tab's mixed output, it is resampled to 16 kHz
+PCM and streamed to `gemini-3.5-transcribe-live` through the Worker relay. Its honest price is one mixed
+channel, hence no speaker names - captions are the path that keeps them.
+
 What is still stubbed, said plainly as the brief requires:
 
 - No bot dials into a real Zoom/Meet/Teams call. The *source* of audio is you, not a meeting platform.

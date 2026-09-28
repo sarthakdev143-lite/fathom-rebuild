@@ -150,6 +150,13 @@ profile. Show it on camera.**
 
 **Take one highlight mid-stream.** Then **click** "End" and **"Open the recording"**.
 
+**Then point at the green button:** "Capture the meeting tab's audio."
+
+> "This is the one people ask about: does it hear the other participants? This hears the whole room -
+> the platform mixes everyone into the tab's audio, so capturing the tab captures the meeting, which is
+> exactly how bot-free notetakers work. The price is one mixed channel, so no speaker names. Names come
+> from the extension, which reads the captions instead."
+
 > "Ending it drops you into the recording. In the real product that's where the bot produced the
 > transcript; here it's the seeded meeting the script came from."
 

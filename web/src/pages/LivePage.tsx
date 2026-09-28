@@ -50,10 +50,15 @@ export default function LivePage() {
   const [log, setLog] = useState<string[]>([]);
   // Real capture mode: microphone -> this page -> /api/live-asr -> Gemini Live.
   const [mic, setMic] = useState<"idle" | "live" | "error">("idle");
+  const [tab, setTab] = useState<"idle" | "live" | "error">("idle");
   const [interim, setInterim] = useState("");
   const [finals, setFinals] = useState<{ at: number; text: string }[]>([]);
   const [micErr, setMicErr] = useState<string | null>(null);
   const micRef = useRef<{ ws: WebSocket; ctx: AudioContext; stream: MediaStream; node: ScriptProcessorNode } | null>(null);
+  const tabRef = useRef<{ ws: WebSocket; ctx: AudioContext; stream: MediaStream; node: ScriptProcessorNode } | null>(null);
+  const [tabFinals, setTabFinals] = useState<{ at: number; text: string }[]>([]);
+  const [tabInterim, setTabInterim] = useState("");
+  const [tabErr, setTabErr] = useState<string | null>(null);
   const startedAtRef = useRef(0);
   const esRef = useRef<EventSource | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -101,6 +106,91 @@ export default function LivePage() {
   };
 
   const stop = () => { esRef.current?.close(); setPhase("ended"); };
+
+  // The path that hears EVERYONE. The platform mixes all participants into the
+  // audio of the tab playing the call, so capturing that tab captures the whole
+  // room - which is precisely how bot-free notetakers work. The video track is
+  // dropped immediately; only audio is used. Cost: no speaker names, because the
+  // mix is one channel. Captions (the extension) are the path that keeps names.
+  const startTabAudio = async () => {
+    setTabErr(null);
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+    } catch (e: any) {
+      setTab("error"); setTabErr(`Tab capture refused: ${e?.message || e}`); return;
+    }
+    if (stream.getAudioTracks().length === 0) {
+      stream.getTracks().forEach((t) => t.stop());
+      setTab("error");
+      setTabErr("No audio in that capture. Pick the TAB itself and tick “Share tab audio” - a window or screen without the audio checkbox carries no sound.");
+      return;
+    }
+    stream.getVideoTracks().forEach((t) => t.stop()); // we only want the room's audio
+    const audioStream = new MediaStream(stream.getAudioTracks());
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${location.host}/api/live-asr`);
+    const ctx = new AudioContext();
+    const src = ctx.createMediaStreamSource(audioStream);
+    const node = ctx.createScriptProcessor(4096, 1, 1);
+    startedAtRef.current = Date.now();
+    setTabFinals([]); setTabInterim("");
+    ws.onopen = () => {
+      node.onaudioprocess = (ev) => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ audio: b64(toPcm16(ev.inputBuffer.getChannelData(0), ctx.sampleRate)) }));
+      };
+      src.connect(node);
+      node.connect(ctx.destination);
+      setTab("live");
+      setLog((l) => [...l, `${new Date().toLocaleTimeString()} — tab audio streaming to gemini-3.5-transcribe-live (all participants)`]);
+    };
+    ws.onmessage = (ev) => {
+      const d: any = JSON.parse(ev.data);
+      if (d.type === "interim") setTabInterim(d.text);
+      if (d.type === "final") { setTabInterim(""); setTabFinals((f) => [...f, { at: d.at - startedAtRef.current, text: d.text }]); }
+      if (d.type === "error") { setTab("error"); setTabErr(d.message); }
+    };
+    ws.onerror = () => { setTab("error"); setTabErr("the live transcription socket failed"); };
+    // If the user stops sharing from the browser UI, end cleanly.
+    audioStream.getAudioTracks()[0].addEventListener("ended", () => stopTabAudio());
+    tabRef.current = { ws, ctx, stream, node };
+  };
+
+  const stopTabAudio = async () => {
+    const m = tabRef.current;
+    if (!m) return;
+    m.ws.send(JSON.stringify({ stop: true }));
+    m.node.disconnect();
+    m.stream.getTracks().forEach((t) => t.stop());
+    m.ctx.close().catch(() => {});
+    m.ws.close();
+    tabRef.current = null;
+    setTab("idle"); setTabInterim("");
+    if (!tabFinals.length) { setTabErr("Nothing was transcribed from the tab audio."); return; }
+    const segments = tabFinals.map((f, i) => ({
+      speaker: "Speaker 1",
+      text: f.text,
+      start_ms: f.at,
+      end_ms: i + 1 < tabFinals.length ? tabFinals[i + 1].at : f.at + 4000,
+    }));
+    const res = await fetch("/api/meetings/from-transcript", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: `Tab audio capture — ${new Date().toLocaleString("en-GB")}`,
+        platform: "tab-audio",
+        segments,
+        duration_ms: Date.now() - startedAtRef.current,
+        note: "Captured from the meeting tab's mixed audio via gemini-3.5-transcribe-live. This path hears every participant but receives one mixed channel, so speaker names are not available; the captions extension is the path that keeps them.",
+      }),
+    });
+    const d: any = await res.json();
+    if (res.ok) window.location.href = `/meetings/${d.id}`;
+    else setTabErr(`Could not save: ${d.error || res.statusText}`);
+  };
 
   const startMic = async () => {
     setMicErr(null);
@@ -219,8 +309,22 @@ export default function LivePage() {
 
               <button onClick={mic === "live" ? stopMic : startMic}
                       className={`focus-ring w-full py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${mic === "live" ? "bg-red-600 text-white hover:bg-red-700" : "border border-ink-200 bg-white text-ink-700 hover:border-accent/50 hover:text-accent"}`}>
-                {mic === "live" ? "■ Stop and save the transcription" : "🎙 Transcribe my microphone (real ASR)"}
+                {mic === "live" ? "■ Stop and save the transcription" : "🎙 My microphone only (hears me, not the room)"}
               </button>
+
+              <button onClick={tab === "live" ? stopTabAudio : startTabAudio}
+                      className={`focus-ring w-full mt-2 py-2.5 rounded-lg text-[13.5px] font-medium transition-colors ${tab === "live" ? "bg-red-600 text-white hover:bg-red-700" : "border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"}`}>
+                {tab === "live" ? "■ Stop and save the meeting" : "🎧 Capture the meeting tab's audio (hears EVERYONE)"}
+              </button>
+              {tabErr && <p className="text-[11.5px] text-red-700 mt-2 leading-relaxed">{tabErr}</p>}
+              {tab !== "error" && (
+                <p className="text-[11.5px] text-ink-400 mt-2 leading-relaxed">
+                  The platform mixes every participant into the tab's audio, so this hears the whole room -
+                  the same trick bot-free notetakers use. Pick the <strong>tab</strong> playing the call and tick
+                  "Share tab audio". Trade-off: one mixed channel, so no speaker names; the extension's caption
+                  path keeps names.
+                </p>
+              )}
               {micErr && <p className="text-[11.5px] text-red-700 mt-2 leading-relaxed">{micErr}</p>}
               {mic !== "error" && (
                 <p className="text-[11.5px] text-ink-400 mt-3 leading-relaxed">
@@ -281,6 +385,14 @@ export default function LivePage() {
                 </div>
               </div>
 
+              {tab === "live" && (
+                <div className="px-4 py-2.5 border-b border-ink-200 bg-emerald-50/70">
+                  <div className="flex items-center gap-2 text-[12px] text-emerald-900">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-dot" /> listening to the whole room — {tabFinals.length} finalised line{tabFinals.length === 1 ? "" : "s"}
+                  </div>
+                  {tabInterim && <p className="text-[12.5px] text-ink-500 italic mt-1">{tabInterim}…</p>}
+                </div>
+              )}
               {mic === "live" && (
                 <div className="px-4 py-2.5 border-b border-ink-200 bg-red-50/60">
                   <div className="flex items-center gap-2 text-[12px] text-red-800">
@@ -290,6 +402,13 @@ export default function LivePage() {
                 </div>
               )}
               <div ref={scroller} className="h-[46vh] overflow-y-auto px-4 py-3 space-y-1.5">
+                {tabFinals.map((f, i) => (
+                  <div key={`tab-${i}`} className="flex gap-2.5 fade-up">
+                    <span className="shrink-0 text-[10.5px] tabular-nums text-ink-400 w-[38px] text-right">{fmtClock(f.at)}</span>
+                    <span className="shrink-0 text-[12px] font-semibold w-[100px] truncate text-emerald-600">room</span>
+                    <p className="flex-1 text-[13px] leading-[1.6] text-ink-700">{f.text}</p>
+                  </div>
+                ))}
                 {finals.map((f, i) => (
                   <div key={`mic-${i}`} className="flex gap-2.5 fade-up">
                     <span className="shrink-0 text-[10.5px] tabular-nums text-ink-400 w-[38px] text-right">{fmtClock(f.at)}</span>

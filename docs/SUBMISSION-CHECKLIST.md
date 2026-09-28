@@ -17,7 +17,9 @@ paste the link. Under five minutes, camera on.
 
 ## Before you record (**YOU**, ~12 minutes)
 
-1. **Real-call extension test** — `docs/EXTENSION-TEST.md`. Five minutes. Load
+1. **Real-call capture test** — `docs/EXTENSION-TEST.md`. Five minutes. (Fallback if captions are a
+   problem: on `/live`, use **Capture the meeting tab's audio** and tick "Share tab audio" - it hears
+   everyone without captions, at the cost of speaker names.) Load
    unpacked, one call with any second voice, captions on, one deliberate action
    sentence, leave, check the library. If a selector has rotted, screenshot the
    popup and the captions DOM and send it; the fix is a selector list edit.
