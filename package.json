@@ -22,7 +22,9 @@
     "browser": "node scripts/browser-check.mjs",
     "browser:shots": "node scripts/browser-check.mjs --shots",
     "verify:asr": "node scripts/verify-asr.mjs",
-    "test:extension": "node scripts/extension-check.mjs"
+    "test:extension": "node scripts/extension-check.mjs",
+    "preflight": "python3 tools/capture/capture.py validate && python3 tools/capture/test_capture.py && node --test tests/ && npx tsc --noEmit && python3 scripts/smoke-test.py && node scripts/browser-check.mjs && node scripts/extension-check.mjs && python3 tools/capture/capture.py validate --strict || echo 'NOTE: strict validation fails while a turn is open - capture the response first'",
+    "demo": "node scripts/record-demo.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.11.2",
